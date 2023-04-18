@@ -1,0 +1,46 @@
+version: "3.5"
+services:
+
+  api_server:
+    build:
+      context: .
+      dockerfile: 'Dockerfile.dev' # still needs to be added
+    depends_on:
+      - ts-db
+    restart: on-failure
+    ports:
+      - "8000:80"
+    environment:
+      - DOCKERHOST=${DOCKERHOST}
+    networks:
+      - analysis-net
+
+
+  ts-db:
+    image: "timescale/timescaledb:2.10.1-pg12"
+    container_name: "ts-db"
+    command: postgres -c shared_preload_libraries=timescaledb
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=analysis_db
+      - TIMESCALEDB_TELEMETRY=off
+    ports:
+      - "5432:5432"
+    networks:
+      - analysis-net
+    volumes:
+      - db_data:/var/lib/postgresql/data/
+      - ./db_init:/docker-entrypoint-initdb.d
+
+volumes:
+  db_data:
+    external: false
+
+networks:
+  analysis-net:
+    name: analysis-net
+    driver: bridge
+    # Just to work together with the client network
+    driver_opts:
+      com.docker.network.driver.mtu: 1440
