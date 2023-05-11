@@ -22,3 +22,10 @@ token pro nutzer - id für run wird von eigener Plattform generiert - damit ist 
  - Was ist das Toolkit ...
  - Was ist die Herausforderungen, was sind die Rahmenbedingungen und was ist das Ziel? 
  - Was ist das Projekt?
+
+
+
+aktuelle Probleme:
+
+ModuleNotFoundError: No module named 'pydantic'  
+warum ?
