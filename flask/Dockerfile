@@ -1,11 +1,11 @@
-FROM python:3.10-slim-buster
+FROM python:3.10.11-slim-buster
 
-
-
-COPY requirements.txt /src
 WORKDIR /src
-RUN pip3 -m install -r requirements.txt
 
-COPY . /src
+ADD ./requirements.txt /src/
+
+RUN pip install -r requirements.txt
+
+COPY . /src/
 
 CMD ["python3 -m", "server.py"]
