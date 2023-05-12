@@ -26,10 +26,11 @@ services:
       - 8000:8000
 
   mongo:
+    container_name: mongo
     image: mongo
     restart: always
     ports:
-      - 8005:8005
+      - '27017:27017'
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example

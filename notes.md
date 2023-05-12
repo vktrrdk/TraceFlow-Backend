@@ -30,4 +30,5 @@ aktuelle Probleme:
 ModuleNotFoundError: No module named 'pydantic'  klappt außerhalb des containers
 warum ?
 
-datenbank anbinden!
+check if mongo-db really is the best way to do it
+validierung von users, runs und tokens und unique users and tokens
