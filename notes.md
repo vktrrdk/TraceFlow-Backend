@@ -27,5 +27,7 @@ token pro nutzer - id für run wird von eigener Plattform generiert - damit ist 
 
 aktuelle Probleme:
 
-ModuleNotFoundError: No module named 'pydantic'  
+ModuleNotFoundError: No module named 'pydantic'  klappt außerhalb des containers
 warum ?
+
+datenbank anbinden!
