@@ -5,7 +5,7 @@
  
 ### Implementation Erste Schritte - API Token
 
-[ ] Welche Frameworks? django zu groß? Flask (https://flask.palletsprojects.com/en/2.2.x/)?
+- [ ] Welche Frameworks? django zu groß? Flask (https://flask.palletsprojects.com/en/2.2.x/)?
 
 API-Token - a la: testplatform.de/path/token=1123521354234 …  cmd: weblog http://testplatform.de/path/token=1123521354234
 Token pro Nutzer oder pro Aufruf? Token nur für die Plattform, aber nicht für die lokale Ausführung
@@ -14,8 +14,8 @@ token pro nutzer - id für run wird von eigener Plattform generiert - damit ist 
 
 ### Orga
 
- [ ] Daniels Projekt anschauen
- [ ] LaTex-Template anlegen
+- [ ] Daniels Projekt anschauen
+- [ ] LaTex-Template anlegen
 
 ### Schriftlich
  - Was ist de.NBI?
@@ -32,3 +32,9 @@ warum ?
 
 check if mongo-db really is the best way to do it
 validierung von users, runs und tokens und unique users and tokens
+
+django statt flask...? 
+vorhandene projekte auf github abchecken!
+
+
+check this: https://github.com/tiangolo/full-stack-fastapi-postgresql

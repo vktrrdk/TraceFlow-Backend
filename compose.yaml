@@ -11,30 +11,33 @@ services:
 
   backend:
     build:
-      context: flask
+      context: fastapi
       target: builder
-    # flask requires SIGINT to stop gracefully
+    # fastapi requires SIGINT to stop gracefully
     # (default stop signal from Compose is SIGTERM)
     stop_signal: SIGINT
     environment:
       - FLASK_SERVER_PORT=9091
     volumes:
-      - ./flask:/src
+      - ./fastapi:/src
     depends_on:
-      -  mongo
+      -  database
     ports:
       - 8000:8000
 
-  mongo:
-    container_name: mongo
-    image: mongo
+  database:
+    container_name: postgres_database
+    image: timescale/timescaledb:2.10.3-pg15
     restart: always
     ports:
-      - '27017:27017'
+      - 8010:8010
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: example
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpassword
+      - POSTGRES_DB=pgdatabase
+      - TIMESCALEDB_TELEMETRY=off
+
     volumes:
-      - ./mongo/data:/data/db
+      - ./postgres/data:/var/lib/postgresql/data
 
 
