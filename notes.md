@@ -38,3 +38,6 @@ vorhandene projekte auf github abchecken!
 
 
 check this: https://github.com/tiangolo/full-stack-fastapi-postgresql
+
+check the annotation stuff - why is python 3.9 runnning and not 3.11?
+    https://fastapi.tiangolo.com/tutorial/query-params-str-validations/

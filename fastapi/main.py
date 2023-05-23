@@ -1,9 +1,18 @@
-from fastapi import FastAPI, Query
-import random, string
-from pydantic import BaseModel
-from typing import Annotated
+from fastapi import Depends, FastAPI, Query, HTTPException
+from sqlalchemy.orm import Session
+
+import crud, models, schemas
+from database import SessionLocal, engine
+
 
 app = FastAPI()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @app.get("/")
@@ -16,11 +25,11 @@ async def create_token_for_user(user_id: str):
         return {"create": "Not able to create"}
     else:
 
-        return {"token": create_random_token()}
+        return {"token": ""}
 
 @app.get("/create/token/")
 async def create_token():
-    return {"token": create_random_token()}
+    return {"token": ""}
 
 @app.get("/user/runs/{user_id}")
 async def get_user_runs(user_id: str):
@@ -29,14 +38,10 @@ async def get_user_runs(user_id: str):
         return {"runs": runs}
     else:
         return {"runs": []}
-    """
-    check the annotation stuff - why is python 3.9 runnning and not 3.11?
-    https://fastapi.tiangolo.com/tutorial/query-params-str-validations/
-    """
 
-@app.get("user/create/{name}")
-async def create_user(name: str):
-    #user = User()
+@app.get("/user/create/{name}")
+async def create_user(name: str, db: Session = Depends(get_db)):
+    return crud.create_user(db, name=name)
 
 
 def get_runs_for_user(user_id):
@@ -44,11 +49,6 @@ def get_runs_for_user(user_id):
         if user["user_id"] == user_id:
             return user["run_tokens"]
     return []
-
-
-def create_random_token():
-    alphabet = string.ascii_lowercase + string.ascii_uppercase
-    return ''.join((random.choice(alphabet) for i in range(0, 15)))
 
 
 
@@ -67,8 +67,3 @@ fake_items_db = [
     },
 
 ]
-
-class User(BaseModel):
-    user_id: str
-    name: str
-    run_tokens: [str]
