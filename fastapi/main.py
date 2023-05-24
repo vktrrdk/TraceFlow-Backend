@@ -20,12 +20,31 @@ async def root():
     return {"message": "Hello World"}
 
 @app.get("/create/token/user/{user_id}")
-async def create_token_for_user(user_id: str):
+async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
     if not user_id:
         return {"create": "Not able to create"}
     else:
+        user = crud.get_user(db, user_id)
+        if not user:
+            return {"create": "Not able to create"}
+        token = crud.create_token(db)
+        user = crud.add_token_to_user(db, user.id, token)
+        return {"user": user.id, "token": token.id}
 
-        return {"token": ""}
+@app.get("/remove/token/{token_id}")
+async def remove_token(token_id: str, db: Session = Depends(get_db)):
+    if not token_id:
+        return {"remove": "Not able to remove"}
+    else:
+        token = crud.get_token(db, token_id)
+        if token:
+            return crud.remove_token(db, token)
+        else:
+            return {"remove": "Not able to remove"}
+
+@app.get("/test/token/")
+async def get_all_tokens(db: Session = Depends(get_db)):
+    return crud.get_all_token(db)
 
 @app.get("/create/token/")
 async def create_token():
@@ -42,6 +61,10 @@ async def get_user_runs(user_id: str):
 @app.get("/user/create/{name}")
 async def create_user(name: str, db: Session = Depends(get_db)):
     return crud.create_user(db, name=name)
+
+@app.get("/test/users/")
+async def get_all_users(db: Session = Depends(get_db)):
+    return crud.get_all_users(db)
 
 
 def get_runs_for_user(user_id):

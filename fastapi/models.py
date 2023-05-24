@@ -8,8 +8,7 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     name = Column(String)
-    run_tokens = Column(ForeignKey('runtoken.id'))
-    # Column('CountyCode', String, ForeignKey('tblCounty.CountyCode'))
+    run_tokens = Column('run_tokens', String, ForeignKey('runtoken.id'))
 
     # how to solve the problems with the relations?
 
