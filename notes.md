@@ -25,3 +25,17 @@ token pro nutzer - id für run wird von eigener Plattform generiert - damit ist 
  - Was ist das Ziel der Implementation?
 
 alembic und sql-alchemy verstehen
+
+# Weitere Schritte
+
+ - Token/User handling fertigstellen (Sqlalchemy)
+ - get post usw anpassen
+ - vererbung betrachten (models)
+ - error handling
+ - Kontakt mit Goebel und Beckstette
+ - Vorschläge für Schnittstellen
+ - Anbindung von Nextflow traces
+ - Persistenz von traces
+ - UML Diagramme machen
+ - Nochmal schauen wie die Config von nextflow angepasst werden kann, sodass man mehr metriken bekommt!
+ - checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
