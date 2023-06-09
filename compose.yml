@@ -15,3 +15,21 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+  nfa_api:
+    container_name: nfa_api
+    image: nf-analysis-api:latest
+    build:
+      context: fastapi/
+      dockerfile: Dockerfile
+    ports:
+      - "8000:80"
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - nfa_db
+    restart: unless-stopped

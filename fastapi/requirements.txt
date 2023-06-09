@@ -3,3 +3,4 @@ uvicorn==0.22.0
 SQLAlchemy==2.0.15
 psycopg2==2.9.6
 alembic==1.11.1
+pydantic==1.10.9
