@@ -2,6 +2,7 @@ import json
 from json import JSONDecodeError
 
 from fastapi import Depends, FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 import crud, models, schemas
@@ -9,6 +10,18 @@ from database import SessionLocal, engine
 
 
 app = FastAPI()
+
+#"http://localhost",
+#    "http://localhost:5173/",
+#    "https://localhost",
+#    "https://localhost:5173/"
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+)
 
 def get_db():
     db = SessionLocal()
@@ -85,12 +98,11 @@ async def create_token(db: Session = Depends(get_db)):
     return {"token": created_token}
 
 @app.get("/user/token/{user_id}")
-async def get_user_runs(user_id: str):
+async def get_user_information(user_id: str, db: Session = Depends(get_db)):
     if user_id:
-        runs = []
-        return {"runs": runs}
+        return crud.get_user(db, user_id)
     else:
-        return {"runs": []}
+        return {"user": None}
 
 @app.get("/user/create/{name}")
 async def create_user(name: str, db: Session = Depends(get_db)):

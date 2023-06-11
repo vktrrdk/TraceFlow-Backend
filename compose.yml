@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
   nfa_api:
     container_name: nfa_api
-    image: nf-analysis-api:latest
+    image: nf-analysis-api:0.0.1
     build:
       context: fastapi/
       dockerfile: Dockerfile
