@@ -58,6 +58,18 @@ async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
         user = crud.add_token_to_user(db, user.id, token)
         return {"user": user.id, "token": token.id}
 
+@app.get("/token/validate/{token_id}")
+async def validate_token(token_id: str, db: Session = Depends(get_db)):
+    if not token_id:
+        return {"valid": False}
+    else:
+        token = crud.get_token(db, token_id)
+        if token is not None:
+            return {"valid": True}
+        else:
+            return {"valid": False}
+
+
 @app.get("/remove/token/{token_id}")
 async def remove_token(token_id: str, db: Session = Depends(get_db)):
     """
@@ -152,6 +164,16 @@ async def get_all_users(db: Session = Depends(get_db)):
     :return:
     """
     return crud.get_all_users(db)
+
+@app.get("/run/information/{token_id}")
+async def get_run_information(token_id: str, db: Session = Depends(get_db)):
+    """
+    Returns all information persisted for a certain token.
+    :param token_id: The id of the run-token
+    :param db:
+    :return: information on run with token
+    """
+    return crud.get_run_information(db, token_id)
 
 @app.get("/test/trace/all/")
 async def get_full_trace(db: Session = Depends(get_db)):

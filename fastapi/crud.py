@@ -8,7 +8,7 @@ def get_user(db: Session, id: string):
 
 def create_user(db: Session, name: str):
     token = create_random_token()
-    db_user = models.User(id=token, name=name)
+    db_user = models.User(id=token, name=name, run_tokens=[])
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -26,6 +26,14 @@ def get_all_token(db: Session):
 def get_full_trace(db: Session):
     return db.query(models.RunTrace).all()
 
+def get_run_information(db: Session, token_id: str):
+    token = get_token(db, token_id)
+    if token is not None:
+        return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
+    else:
+        return {"error": "no such token"}
+
+
 
 def get_full_meta(db: Session):
     return db.query(models.RunMetadata).all()
@@ -40,8 +48,8 @@ def create_token(db: Session):
     return db_token
 
 def get_token(db: Session, token_id: str):
-    token = db.query(models.RunToken).get(token_id)
-    return token
+    return db.query(models.RunToken).get(token_id)
+
 
 def remove_token(db: Session, token):
     user = db.query(models.User).filter(models.User.run_tokens.contains([token.id])).first()
