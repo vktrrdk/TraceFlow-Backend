@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from database import Base
 
-class AddTokenItem(BaseModel):
+class UserTokenItem(BaseModel):
     token: str
     user_token: str
 

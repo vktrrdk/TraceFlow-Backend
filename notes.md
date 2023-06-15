@@ -29,14 +29,15 @@ alembic und sql-alchemy verstehen
 # Weitere Schritte
 
  - Token/User handling fertigstellen (Sqlalchemy) (es fehlen noch einige sachen)
- - get post usw anpassen 
- - vererbung betrachten (models)
- - error handling
- - Kontakt mit Goebel und Beckstette
- - Vorschläge für Schnittstellen
- - Anbindung von Nextflow traces
- - Persistenz von traces
+ - get post usw anpassen !
+ - vererbung betrachten (models) !
+ - error handling !
+ - Kontakt mit Goebel und Beckstette !
+ - Vorschläge für Schnittstellen !
+ - Anbindung von Nextflow traces !
+ - Persistenz von traces !
  - UML Diagramme machen
  - Nochmal schauen wie die Config von nextflow angepasst werden kann, sodass man mehr metriken bekommt!
  - checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
  - check https://router.vuejs.org/guide/ und components
+ - responses der api anpassen!

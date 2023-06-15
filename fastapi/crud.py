@@ -54,11 +54,10 @@ def get_token(db: Session, token_id: str):
 def remove_token(db: Session, token):
     user = db.query(models.User).filter(models.User.run_tokens.contains([token.id])).first()
     if user:
-        return remove_token_from_user(db, user, token)
-    else:
-        db.delete(token)
-        db.commit()
-        return {"removed": True, "from_user": False}
+        remove_token_from_user(db, user, token)
+    db.delete(token)
+    db.commit()
+    return {"removed": True, "from_user": user is not None}
 
 
 def remove_all_token_from_user(user_id: str, db: Session):
@@ -71,10 +70,12 @@ def remove_all_token_from_user(user_id: str, db: Session):
 
 def add_token_to_user(db: Session, user_id, token):
     user = get_user(db, user_id)
-    user.run_tokens.append(token.id)
-    db.commit()
-    db.refresh(user)
-    return user
+    if token.id not in user.run_tokens:
+        user.run_tokens.append(token.id)
+        db.commit()
+        db.refresh(user)
+        return {"added": True}
+    return {"added": False}
 
 
 def remove_token_from_user(db: Session, user, token):
@@ -89,8 +90,6 @@ def remove_token_from_user(db: Session, user, token):
     user.run_tokens = new_tokens
     db.commit()
     db.refresh(user)
-    db.commit()
-    db.delete(token)
 
     return {"deleted": True, "from_user": True}
 

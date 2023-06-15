@@ -56,16 +56,16 @@ async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
         if not user:
             return {"create": "Not able to create"}
         token = crud.create_token(db)
-        user = crud.add_token_to_user(db, user.id, token)
-        return {"user": user.id, "token": token.id}
+        result = crud.add_token_to_user(db, user.id, token)
+        if result["added"]:
+            return {"user": user_id, "token": token.id}
+        else:
+            return {"create": "Not able to create"}
 
 @app.post("/add/token/user")
-async def add_token_to_user(add_token_item: models.AddTokenItem, db: Session = Depends(get_db)):
-
+async def add_token_to_user(add_token_item: models.UserTokenItem, db: Session = Depends(get_db)):
     token = add_token_item.token
-    print(token)
     user_token = add_token_item.user_token
-    print(user_token)
     if not user_token:
         return {"add": "unable to add token to user - no user-token given"}
     else:
@@ -73,12 +73,31 @@ async def add_token_to_user(add_token_item: models.AddTokenItem, db: Session = D
         if user:
             token = crud.get_token(db, token_id=token)
             if token is not None:
-                crud.add_token_to_user(db=db, token=token, user_id=user_token)
-                return {"add": f"added token {token} to user with token {user_token}"}
+                return crud.add_token_to_user(db=db, token=token, user_id=user_token)
             else:
                 return {"add": "unable to add token to user - token is not valid"}
         else:
             return {"add": "unable to add token to user - no user for given token"}
+
+
+@app.delete("/user/{user_id}}/token/{token_id}")
+async def remove_token_from_user(user_id: str, token_id: str, db: Session = Depends(get_db)):
+    if not user_id or not token_id:
+        return {"delete": "unable to delete token due to missing user_id or token_id"}
+    else:
+        user = crud.get_user(db, user_id)
+        if not user:
+            return {"delete": "unable to delete token due faulty user-id"}
+        else:
+            token = crud.get_token(db, token_id)
+            if not token:
+                return {"delete": "unable to delete token due faulty token-id"}
+            else:
+                result = crud.remove_token_from_user(db, user, token)
+                if result["deleted"] and result["from_user"]:
+                    return {"delete": f"deleted token {token_id} from user with token {user_id}"}
+                else:
+                    return {"delete": "an error occurred while deleting the requested token from the user"}
 
 
 @app.get("/token/validate/{token_id}")
@@ -135,7 +154,10 @@ async def create_token(db: Session = Depends(get_db)):
 @app.get("/user/token/{user_id}")
 async def get_user_information(user_id: str, db: Session = Depends(get_db)):
     if user_id:
-        return crud.get_user(db, user_id)
+        user = crud.get_user(db, user_id)
+        if not user:
+            return {"user": None}
+        return user
     else:
         return {"user": None}
 
