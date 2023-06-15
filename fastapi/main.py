@@ -21,6 +21,7 @@ origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_methods=["*"],
 )
 
 def get_db():
@@ -57,6 +58,28 @@ async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
         token = crud.create_token(db)
         user = crud.add_token_to_user(db, user.id, token)
         return {"user": user.id, "token": token.id}
+
+@app.post("/add/token/user")
+async def add_token_to_user(add_token_item: models.AddTokenItem, db: Session = Depends(get_db)):
+
+    token = add_token_item.token
+    print(token)
+    user_token = add_token_item.user_token
+    print(user_token)
+    if not user_token:
+        return {"add": "unable to add token to user - no user-token given"}
+    else:
+        user = crud.get_user(db, user_token)
+        if user:
+            token = crud.get_token(db, token_id=token)
+            if token is not None:
+                crud.add_token_to_user(db=db, token=token, user_id=user_token)
+                return {"add": f"added token {token} to user with token {user_token}"}
+            else:
+                return {"add": "unable to add token to user - token is not valid"}
+        else:
+            return {"add": "unable to add token to user - no user for given token"}
+
 
 @app.get("/token/validate/{token_id}")
 async def validate_token(token_id: str, db: Session = Depends(get_db)):

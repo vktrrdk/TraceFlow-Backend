@@ -4,10 +4,13 @@ from sqlalchemy import Column, String, DateTime, Integer
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.mutable import MutableList
 
-
+from pydantic import BaseModel
 
 from database import Base
 
+class AddTokenItem(BaseModel):
+    token: str
+    user_token: str
 
 class User(Base):
     __tablename__ = "user"
