@@ -26,13 +26,9 @@ def get_all_token(db: Session):
 def get_full_trace(db: Session):
     return db.query(models.RunTrace).all()
 
-def get_run_information(db: Session, token_id: str):
-    token = get_token(db, token_id)
-    if token is not None:
-        return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
-    else:
-        return {"error": "no such token"}
 
+def get_run_information(db: Session, token_id: str):
+    return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
 
 
 def get_full_meta(db: Session):
@@ -62,10 +58,11 @@ def remove_token(db: Session, token):
 
 def remove_all_token_from_user(user_id: str, db: Session):
     user = get_user(db, user_id)
+    tokens = user.run_tokens
     user.run_tokens = []
     db.commit()
     db.refresh(user)
-    return True
+    return {"user": user_id, "removed_tokens": tokens}
 
 
 def add_token_to_user(db: Session, user_id, token):

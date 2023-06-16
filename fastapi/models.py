@@ -8,10 +8,23 @@ from pydantic import BaseModel
 
 from database import Base
 
+"""
+Request models
+"""
+
+
 class UserTokenItem(BaseModel):
     token: str
     user_token: str
 
+
+class AddUserItem(BaseModel):
+    name: str
+
+
+"""
+Database models
+"""
 class User(Base):
     __tablename__ = "user"
 

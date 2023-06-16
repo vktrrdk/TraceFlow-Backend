@@ -3,6 +3,7 @@ from json import JSONDecodeError
 
 from fastapi import Depends, FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 import crud, models, schemas
@@ -40,155 +41,226 @@ async def root():
     """
     return {"message": "Hello World"}
 
-@app.get("/create/token/user/{user_id}")
+@app.get("/user/{user_id}/token/create")
 async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
     """
     Creating a token for a user provided by his/her id.
 
     :param user_id: The user id of the user for whom the token is to be created
-    :param db: the database to connect to
-    :return: json with user-token and newly generated token
+    :param db: the database to send the request to
+    :return: json-response with user-token and newly generated token or error message
     """
     if not user_id:
-        return {"create": "Not able to create"}
+        return JSONResponse(content={"error": "No user id provided"}, status_code=400)
     else:
         user = crud.get_user(db, user_id)
         if not user:
-            return {"create": "Not able to create"}
+            return JSONResponse(content={"error": "User with given id not found"}, status_code=404)
         token = crud.create_token(db)
         result = crud.add_token_to_user(db, user.id, token)
+        # TODO: check if refactoring needed for result
         if result["added"]:
-            return {"user": user_id, "token": token.id}
+            return JSONResponse(content={"user": user_id, "token": token.id}, status_code=201)
         else:
-            return {"create": "Not able to create"}
+            return JSONResponse(content={"error": "An error occurred while adding the token"}, status_code=500)
 
-@app.post("/add/token/user")
+@app.post("/user/token/add")
 async def add_token_to_user(add_token_item: models.UserTokenItem, db: Session = Depends(get_db)):
+    """
+    Enables adding a token to a user, given both the user id and the token id is valid.
+    :param add_token_item: The request body with user id and token id provided
+    :param db: the database to send the request to
+    :return: json-response with user-token and newly generated token or error message
+    TODO: adjust both documentation and response
+    """
     token = add_token_item.token
     user_token = add_token_item.user_token
     if not user_token:
-        return {"add": "unable to add token to user - no user-token given"}
+        return JSONResponse(content={"error": "No user id provided"}, status_code=400)
     else:
         user = crud.get_user(db, user_token)
         if user:
             token = crud.get_token(db, token_id=token)
             if token is not None:
-                return crud.add_token_to_user(db=db, token=token, user_id=user_token)
+                content = crud.add_token_to_user(db=db, token=token, user_id=user_token)
+                return JSONResponse(content=content, status_code=200)
+                # TODO: check if response content is what we want it to be
             else:
-                return {"add": "unable to add token to user - token is not valid"}
+                return JSONResponse(content={"error": "Invalid token provided"}, status_code=400)
         else:
-            return {"add": "unable to add token to user - no user for given token"}
+            return JSONResponse(content={"error": "No user for id provided"}, status_code=404)
 
 
 @app.delete("/user/{user_id}}/token/{token_id}")
 async def remove_token_from_user(user_id: str, token_id: str, db: Session = Depends(get_db)):
-    if not user_id or not token_id:
-        return {"delete": "unable to delete token due to missing user_id or token_id"}
+    """
+    Removes a given token from a given user.
+    :param user_id: The id of the user
+    :param token_id: The id of the token
+    :param db: the database to send the request to
+    :return: json-response with deletion result or error message
+    TODO: adjust if needed
+    """
+    if not user_id:
+        return JSONResponse(content={"error": "No user id provided"}, status_code=400)
+    elif not token_id:
+        return JSONResponse(content={"error": "No token id provided"}, status_code=400)
     else:
         user = crud.get_user(db, user_id)
         if not user:
-            return {"delete": "unable to delete token due faulty user-id"}
+            return JSONResponse(content={"error": "No user for id provided"}, status_code=404)
         else:
             token = crud.get_token(db, token_id)
             if not token:
-                return {"delete": "unable to delete token due faulty token-id"}
+                return JSONResponse(content={"error": "No token for id provided"}, status_code=404)
             else:
                 result = crud.remove_token_from_user(db, user, token)
+                # TODO: refactor result stuff - adjust in crud
                 if result["deleted"] and result["from_user"]:
-                    return {"delete": f"deleted token {token_id} from user with token {user_id}"}
+                    return JSONResponse(content=result, status_code=200)
                 else:
-                    return {"delete": "an error occurred while deleting the requested token from the user"}
+                    return JSONResponse(
+                        content={"error": "An error occurred while removing token from user"},
+                        status_code=500,
+                    )
 
 
 @app.get("/token/validate/{token_id}")
 async def validate_token(token_id: str, db: Session = Depends(get_db)):
+    """
+    Returns whether a given token is valid (exists in the database) or not
+    :param token_id: The id of the token
+    :param db: the database to send the request to
+    :return: json-response with token-validity value or error message
+    """
     if not token_id:
-        return {"valid": False}
+        return JSONResponse(content={"error": "No token id provided"}, status_code=400)
     else:
         token = crud.get_token(db, token_id)
         if token is not None:
-            return {"valid": True}
+            return JSONResponse(content={"valid": True}, status_code=200)
         else:
-            return {"valid": False}
+            return JSONResponse(content={"valid": False}, status_code=200)
 
 
-@app.get("/remove/token/{token_id}")
+@app.delete("/token/remove/{token_id}")
 async def remove_token(token_id: str, db: Session = Depends(get_db)):
     """
-    Removing a token from the database
+    Removing a token from the database. In case the token is associated with a user - it also gets removed from the
+    users token list
 
     :param token_id: the id of the token
-    :param db: --
-    :return: json with result
+    :param db: the database to send the request to
+    :return: json-response with removal result or error message
     """
     if not token_id:
-        return {"remove": "Not able to remove"}
+        return JSONResponse(content={"error": "No token id provided"}, status_code=400)
     else:
         token = crud.get_token(db, token_id)
         if token:
-            return crud.remove_token(db, token)
+            result = crud.remove_token(db, token)
+            return JSONResponse(content=result, status_code=200)
         else:
-            return {"remove": "No such token"}
+            return JSONResponse(content={"error": "No such token"}, status_code=404)
 
 
-@app.get("/remove/token/user/{user_id}")
+@app.delete("/user/{user_id}/remove/token/all/")
 async def remove_user_tokens(user_id: str, db: Session = Depends(get_db)):
     """
+    Removes all tokens for a given user.
     :param user_id: the id of the user to remove all tokens from
-    :param db:
-    :return: returns the result of the removal
+    :param db: the database to send the request to
+    :return: json-response with all removed tokens or error message
     """
-    return {"remove": crud.remove_all_token_from_user(user_id, db)}
+    if not user_id:
+        return JSONResponse(content={"error": "No user id provided"}, status_code=400)
+    user = crud.get_user(db, user_id)
+    if not user:
+        return JSONResponse(content={"error": "No such user"}, status_code=404)
+    result = crud.remove_all_token_from_user(user_id, db)
+    return JSONResponse(content=result, status_code=200)
 
 
-@app.get("/create/token/")
+@app.get("/token/create/")
 async def create_token(db: Session = Depends(get_db)):
     """
-    Creates a token, but it is not linked to a specific user
-    :param db:
+    Creates a token, which is not linked to a user in this step.
+    :param db: the database to send the request to
     :return: returns the token object in json
     """
     created_token = crud.create_token(db)
-    return {"token": created_token}
+    return JSONResponse(content=created_token, status_code=201)
 
-@app.get("/user/token/{user_id}")
+
+@app.get("/user/{user_id}")
 async def get_user_information(user_id: str, db: Session = Depends(get_db)):
+    """
+    Returns user information for user given by id
+    :param user_id: the user id
+    :param db: the database to send the request to
+    :return: returns the user information or an error message
+    """
     if user_id:
         user = crud.get_user(db, user_id)
         if not user:
-            return {"user": None}
-        return user
+            return JSONResponse(content={"error": "No such user"}, status_code=404)
+        else:
+            return JSONResponse(content=user, status_code=200)
     else:
-        return {"user": None}
-
-@app.get("/user/create/{name}")
-async def create_user(name: str, db: Session = Depends(get_db)):
-    return crud.create_user(db, name=name)
+        return JSONResponse(content={"error": "No user id provided"}, status_code=400)
 
 
-@app.post("/test/run/{token_id}")
-async def read_nextflow_run(token_id: str, push: dict):
-    with open(f"trace-{token_id}.json", "r") as current:
-        try:
-            z = json.load(current)
-        except JSONDecodeError:
-            print("NO NOT WORKING")
-            z = []
-        current.close()
-    with open(f"trace-{token_id}.json", "w+") as json_file:
-        z.append(push)
-        json.dump(z, json_file)
-        json_file.close()
-
+@app.post("/user/create")
+async def create_user(add_user_item: models.AddUserItem, db: Session = Depends(get_db)):
+    """
+    Creates a new user with a name provided
+    :param add_user_item: The request body consisting of the name value
+    :param db: the database to send the request to
+    :return: returns the newly created user or an error message
+    """
+    name = add_user_item.name
+    if not name:
+        return JSONResponse(content={"error": "No name provided"}, status_code=400)
+    result = crud.create_user(db, name=name)
+    return JSONResponse(content=result, status_code=201)
 
 
 @app.post("/run/{token_id}")
 async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depends(get_db)):
+    """
+    Endpoint for persistence of run information. Users do use this endpoint when executing
+    their workflows.
+    :param token_id: The token id to connect the information with
+    :param json_ob: The request json object including e.g. the trace
+    :param db: The database to persist the information in
+    :return: Response state
+    """
+    if not token_id:
+        return JSONResponse(content={}, status_code=404)
     token = crud.get_token(db, token_id)
     if token:
         crud.persist_trace(db, json_ob, token)
+        return JSONResponse(content={}, status_code=204)
     else:
-        print("no such token")
+        return JSONResponse(content={}, status_code=400)
+
+
+@app.get("/run/{token_id}")
+async def get_run_information(token_id: str, db: Session = Depends(get_db)):
+    """
+    Returns all information persisted for a certain token.
+    :param token_id: The id of the run-token
+    :param db:
+    :return: information on run with token
+    """
+    if not token_id:
+        return JSONResponse(content={"error": "No token provided"})
+    token = crud.get_token(db, token_id)
+    if not token:
+        return JSONResponse(content={"error": "No such token"})
+    result = crud.get_run_information(db, token)
+    return JSONResponse(content=result, status_code=200)
+
 
 
 
@@ -210,16 +282,6 @@ async def get_all_users(db: Session = Depends(get_db)):
     """
     return crud.get_all_users(db)
 
-@app.get("/run/information/{token_id}")
-async def get_run_information(token_id: str, db: Session = Depends(get_db)):
-    """
-    Returns all information persisted for a certain token.
-    :param token_id: The id of the run-token
-    :param db:
-    :return: information on run with token
-    """
-    return crud.get_run_information(db, token_id)
-
 @app.get("/test/trace/all/")
 async def get_full_trace(db: Session = Depends(get_db)):
     return crud.get_full_trace(db)
@@ -227,4 +289,19 @@ async def get_full_trace(db: Session = Depends(get_db)):
 @app.get("/test/meta/all/")
 async def get_full_meta(db: Session = Depends(get_db)):
     return crud.get_full_meta(db)
+
+@app.post("/test/run/{token_id}")
+async def read_nextflow_run(token_id: str, push: dict):
+    with open(f"trace-{token_id}.json", "r") as current:
+        try:
+            z = json.load(current)
+        except JSONDecodeError:
+            print("NO NOT WORKING")
+            z = []
+        current.close()
+    with open(f"trace-{token_id}.json", "w+") as json_file:
+        z.append(push)
+        json.dump(z, json_file)
+        json_file.close()
+
 
