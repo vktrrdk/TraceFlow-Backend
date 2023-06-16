@@ -58,8 +58,7 @@ async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
             return JSONResponse(content={"error": "User with given id not found"}, status_code=404)
         token = crud.create_token(db)
         result = crud.add_token_to_user(db, user.id, token)
-        # TODO: check if refactoring needed for result
-        if result["added"]:
+        if result["added_token"] == token.id:
             return JSONResponse(content={"user": user_id, "token": token.id}, status_code=201)
         else:
             return JSONResponse(content={"error": "An error occurred while adding the token"}, status_code=500)
@@ -71,7 +70,6 @@ async def add_token_to_user(add_token_item: models.UserTokenItem, db: Session = 
     :param add_token_item: The request body with user id and token id provided
     :param db: the database to send the request to
     :return: json-response with user-token and newly generated token or error message
-    TODO: adjust both documentation and response
     """
     token = add_token_item.token
     user_token = add_token_item.user_token
@@ -83,8 +81,12 @@ async def add_token_to_user(add_token_item: models.UserTokenItem, db: Session = 
             token = crud.get_token(db, token_id=token)
             if token is not None:
                 content = crud.add_token_to_user(db=db, token=token, user_id=user_token)
-                return JSONResponse(content=content, status_code=200)
-                # TODO: check if response content is what we want it to be
+                if content["added_token"] == token.id:
+                    return JSONResponse(content=content, status_code=200)
+                else: return JSONResponse(
+                    content={"error": "An error occurred while adding the token to the user"},
+                    status_code=500,
+                )
             else:
                 return JSONResponse(content={"error": "Invalid token provided"}, status_code=400)
         else:
@@ -99,7 +101,6 @@ async def remove_token_from_user(user_id: str, token_id: str, db: Session = Depe
     :param token_id: The id of the token
     :param db: the database to send the request to
     :return: json-response with deletion result or error message
-    TODO: adjust if needed
     """
     if not user_id:
         return JSONResponse(content={"error": "No user id provided"}, status_code=400)
@@ -115,8 +116,7 @@ async def remove_token_from_user(user_id: str, token_id: str, db: Session = Depe
                 return JSONResponse(content={"error": "No token for id provided"}, status_code=404)
             else:
                 result = crud.remove_token_from_user(db, user, token)
-                # TODO: refactor result stuff - adjust in crud
-                if result["deleted"] and result["from_user"]:
+                if result["removed_token"] == token_id:
                     return JSONResponse(content=result, status_code=200)
                 else:
                     return JSONResponse(

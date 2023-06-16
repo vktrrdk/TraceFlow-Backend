@@ -43,6 +43,7 @@ def create_token(db: Session):
     db.refresh(db_token)
     return db_token
 
+
 def get_token(db: Session, token_id: str):
     return db.query(models.RunToken).get(token_id)
 
@@ -53,7 +54,7 @@ def remove_token(db: Session, token):
         remove_token_from_user(db, user, token)
     db.delete(token)
     db.commit()
-    return {"removed": True, "from_user": user is not None}
+    return {"removed_token": token.id, "removed_from_user": user is not None}
 
 
 def remove_all_token_from_user(user_id: str, db: Session):
@@ -71,8 +72,8 @@ def add_token_to_user(db: Session, user_id, token):
         user.run_tokens.append(token.id)
         db.commit()
         db.refresh(user)
-        return {"added": True}
-    return {"added": False}
+        return {"added_token": token.id}
+    return {"added_token": None}
 
 
 def remove_token_from_user(db: Session, user, token):
@@ -81,14 +82,13 @@ def remove_token_from_user(db: Session, user, token):
         idx = tokens.index(token.id)
     except ValueError:
         print(f"{token.id}: no such token in list of tokens for user {user.id}")
-        return {"deleted": False, "from_user": True}
+        return {"removed_token": None}
     new_tokens = [token for token in tokens if not tokens.index(token) == idx]
-    print(new_tokens)
     user.run_tokens = new_tokens
     db.commit()
     db.refresh(user)
 
-    return {"deleted": True, "from_user": True}
+    return {"removed_token", token.id}
 
 def persist_trace(db: Session, json_ob, token):
     """

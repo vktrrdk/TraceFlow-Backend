@@ -41,3 +41,4 @@ alembic und sql-alchemy verstehen
  - checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
  - check https://router.vuejs.org/guide/ und components
  - responses der api anpassen!
+ - crud anpassen
