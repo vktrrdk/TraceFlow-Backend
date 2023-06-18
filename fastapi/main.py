@@ -4,6 +4,7 @@ from json import JSONDecodeError
 from fastapi import Depends, FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 import crud, models, schemas
@@ -189,7 +190,7 @@ async def create_token(db: Session = Depends(get_db)):
     :return: returns the token object in json
     """
     created_token = crud.create_token(db)
-    return JSONResponse(content=created_token, status_code=201)
+    return JSONResponse(content=jsonable_encoder(created_token), status_code=201)
 
 
 @app.get("/user/{user_id}")
@@ -205,7 +206,7 @@ async def get_user_information(user_id: str, db: Session = Depends(get_db)):
         if not user:
             return JSONResponse(content={"error": "No such user"}, status_code=404)
         else:
-            return JSONResponse(content=user, status_code=200)
+            return JSONResponse(content=jsonable_encoder(user), status_code=200)
     else:
         return JSONResponse(content={"error": "No user id provided"}, status_code=400)
 
@@ -222,7 +223,7 @@ async def create_user(add_user_item: models.AddUserItem, db: Session = Depends(g
     if not name:
         return JSONResponse(content={"error": "No name provided"}, status_code=400)
     result = crud.create_user(db, name=name)
-    return JSONResponse(content=result, status_code=201)
+    return JSONResponse(content=jsonable_encoder(result), status_code=201)
 
 
 @app.post("/run/{token_id}")
@@ -259,7 +260,7 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     if not token:
         return JSONResponse(content={"error": "No such token"})
     result = crud.get_run_information(db, token)
-    return JSONResponse(content=result, status_code=200)
+    return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
 
 

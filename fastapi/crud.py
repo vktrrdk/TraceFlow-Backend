@@ -1,9 +1,12 @@
+import json
+
 from sqlalchemy.orm import Session
 import string, random
 import models, schemas
 
 def get_user(db: Session, id: string):
-    return db.query(models.User).filter(models.User.id == id).first()
+    query = db.query(models.User).filter(models.User.id == id).first()
+    return query
 
 
 def create_user(db: Session, name: str):
@@ -27,8 +30,8 @@ def get_full_trace(db: Session):
     return db.query(models.RunTrace).all()
 
 
-def get_run_information(db: Session, token_id: str):
-    return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
+def get_run_information(db: Session, token: models.RunToken):
+    return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
 def get_full_meta(db: Session):
