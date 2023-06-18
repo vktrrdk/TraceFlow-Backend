@@ -255,10 +255,10 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     :return: information on run with token
     """
     if not token_id:
-        return JSONResponse(content={"error": "No token provided"})
+        return JSONResponse(content={"error": "No token provided"}, status_code=200)
     token = crud.get_token(db, token_id)
     if not token:
-        return JSONResponse(content={"error": "No such token"})
+        return JSONResponse(content={"error": "No such token"}, status_code=404)
     result = crud.get_run_information(db, token)
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
