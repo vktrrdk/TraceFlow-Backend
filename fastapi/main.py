@@ -3,7 +3,7 @@ from json import JSONDecodeError
 
 from fastapi import Depends, FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
@@ -237,13 +237,13 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
     :return: Response state
     """
     if not token_id:
-        return JSONResponse(content={}, status_code=404)
+        return Response(status_code=404)
     token = crud.get_token(db, token_id)
     if token:
         crud.persist_trace(db, json_ob, token)
-        return JSONResponse(content={}, status_code=204)
+        return Response(status_code=204)
     else:
-        return JSONResponse(content={}, status_code=400)
+        return Response(status_code=400)
 
 
 @app.get("/run/{token_id}")
@@ -259,8 +259,11 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     token = crud.get_token(db, token_id)
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
-    result = crud.get_run_information(db, token)
+    result_trace = crud.get_run_trace(db, token)
+    result_state = crud.get_run_state(db, token)
+    result = {"result_trace": result_trace, "result_state": result_state}
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
+
 
 
 

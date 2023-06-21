@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 import string, random
@@ -30,8 +31,29 @@ def get_full_trace(db: Session):
     return db.query(models.RunTrace).all()
 
 
-def get_run_information(db: Session, token: models.RunToken):
+def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
+
+
+def get_run_state(db: Session, token: models.RunToken):
+    information = get_run_trace(db, token)
+    info = get_run_state_information(information)
+    return info
+
+
+def get_run_state_information(objects):
+    ids = {}
+    objects = sorted(objects, key=lambda obj: obj.timestamp)
+
+    for entry in objects:
+        splitted = entry.process.split(":")
+        ids_entry = {
+            "process": splitted[0],
+            "sub_process": splitted[1] if len(splitted) > 1 else None,
+            "status": entry.status
+        }
+        ids[models.RunTrace.get_task_id(entry)] = ids_entry
+    return ids
 
 
 def get_full_meta(db: Session):
@@ -144,6 +166,7 @@ def persist_trace(db: Session, json_ob, token):
             memory=memory,
             disk=disk,
             duration=duration,
+            timestamp=datetime.utcnow(),
         )
         db.add(trace_object)
         db.commit()
