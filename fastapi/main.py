@@ -261,9 +261,13 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     result_trace = crud.get_run_trace(db, token)
     result_state = crud.get_run_state(db, token)
-    result = {"result_trace": result_trace, "result_state": result_state}
+    # result combined = crud.get_run_state_combined(db, token)
+    result = {
+        "result_trace": result_trace,
+        "result_state": result_state,
+        "result_combined": crud.get_run_state_information_combined(result_state),
+    }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
-
 
 
 

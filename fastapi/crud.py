@@ -36,9 +36,7 @@ def get_run_trace(db: Session, token: models.RunToken):
 
 
 def get_run_state(db: Session, token: models.RunToken):
-    information = get_run_trace(db, token)
-    info = get_run_state_information(information)
-    return info
+    return get_run_state_information(get_run_trace(db, token))
 
 
 def get_run_state_information(objects):
@@ -55,6 +53,45 @@ def get_run_state_information(objects):
         ids[entry.task_id] = ids_entry
     return ids
 
+
+def get_run_state_information_combined(ids_json: dict):
+    processes = {}
+    for t_id, t_obj in ids_json.items():
+        if t_obj["process"] in processes:
+            process = processes[t_obj["process"]]
+            subprocesses = process["sub_processes"]
+            subprocesses_temp = [elem["name"] for elem in process["sub_processes"]]
+            if t_obj["sub_process"] in subprocesses_temp:
+                print(t_obj["sub_process"])
+            subprocesses.append(
+                {
+                    "name": t_obj["sub_process"],
+                    "task_id": t_id,
+                    "status": t_obj["status"],
+                    "status_score": get_status_score(t_obj["status"]),
+                },
+            )
+        else:
+            subprocesses = [
+                {
+                    "name": t_obj["sub_process"],
+                    "task_id": t_id,
+                    "status": t_obj["status"],
+                    "status_score": get_status_score(t_obj["status"]),
+                },
+            ]
+            processes[t_obj["process"]] = {"sub_processes": subprocesses}
+
+    return processes
+
+
+def get_status_score(status):
+    if status == "RUNNING":
+        return 1
+    elif status == "COMPLETED":
+        return 2
+    else:
+        return 0
 
 def get_full_meta(db: Session):
     return db.query(models.RunMetadata).all()
