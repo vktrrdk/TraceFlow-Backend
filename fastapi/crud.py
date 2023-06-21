@@ -52,7 +52,7 @@ def get_run_state_information(objects):
             "sub_process": splitted[1] if len(splitted) > 1 else None,
             "status": entry.status
         }
-        ids[models.RunTrace.get_task_id(entry)] = ids_entry
+        ids[entry.task_id] = ids_entry
     return ids
 
 
