@@ -35,61 +35,75 @@ def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
-def get_run_state(db: Session, token: models.RunToken):
-    return get_run_state_information(get_run_trace(db, token))
-
-
-def get_run_state_information(objects):
-    ids = {}
+def get_run_state_by_process(objects):
+    processes = {}
     objects = sorted(objects, key=lambda obj: obj.timestamp)
 
     for entry in objects:
-        splitted = entry.process.split(":")
-        ids_entry = {
-            "process": splitted[0],
-            "sub_process": splitted[1] if len(splitted) > 1 else None,
-            "status": entry.status
-        }
-        ids[entry.task_id] = ids_entry
-    return ids
+        process = entry.process.split(":")[0]
+        if process not in processes:
+            processes[process] = {"tasks": {}}
 
-
-def get_run_state_information_combined(ids_json: dict):
-    processes = {}
-    for t_id, t_obj in ids_json.items():
-        if t_obj["process"] in processes:
-            process = processes[t_obj["process"]]
-            subprocesses = process["sub_processes"]
-            subprocesses_temp = [elem["name"] for elem in process["sub_processes"]]
-            if t_obj["sub_process"] in subprocesses_temp:
-                print(t_obj["sub_process"])
-            subprocesses.append(
-                {
-                    "name": t_obj["sub_process"],
-                    "task_id": t_id,
-                    "status": t_obj["status"],
-                    "status_score": get_status_score(t_obj["status"]),
-                },
-            )
+    for entry in objects:
+        splitted_process_name = entry.process.split(":")
+        task_subname = None
+        if len(splitted_process_name) > 1:
+            task_subname = splitted_process_name[1]
+        process_tasks = processes[entry.process.split(":")[0]]["tasks"]
+        if entry.task_id in process_tasks:
+            task = process_tasks[entry.task_id]
+            task["status"] = entry.status
+            task["status_score"] = get_status_score(entry.status)
+            task["tag"] = entry.tag
+            task["cpus"] = entry.cpus
+            task["memory"] = entry.memory
+            task["disk"] = entry.disk
+            task["duration"] = entry.duration
         else:
-            subprocesses = [
-                {
-                    "name": t_obj["sub_process"],
-                    "task_id": t_id,
-                    "status": t_obj["status"],
-                    "status_score": get_status_score(t_obj["status"]),
-                },
-            ]
-            processes[t_obj["process"]] = {"sub_processes": subprocesses}
+            process_tasks[entry.task_id] = {
+                "sub_task": task_subname,
+                "status": entry.status,
+                "status_score": get_status_score(entry.status),
+                "tag": entry.tag,
+                "cpus": entry.cpus,
+                "memory": entry.memory,
+                "disk": entry.disk,
+                "duration": entry.duration,
+            }
 
     return processes
 
 
+
+# {'BOWTIE':
+#   {'sub_processes':
+#       [
+#           {'name': 'Index', 'task_id': 2, 'status': 'COMPLETED', 'status_score': 2},
+#           {'name': 'Align', 'task_id': 5, 'status': 'COMPLETED', 'status_score': 2},
+#           {'name': 'Align', 'task_id': 4, 'status': 'COMPLETED', 'status_score': 2}
+#       ]
+#   },
+# 'fastqc':
+#   {'sub_processes':
+#       [
+#           {'name': None, 'task_id': 3, 'status': 'COMPLETED', 'status_score': 2},
+#           {'name': None, 'task_id': 1, 'status': 'COMPLETED', 'status_score': 2}
+#       ]
+#   },
+# 'multiqc':
+#   {'sub_processes':
+#       [
+#           {'name': None, 'task_id': 6, 'status': 'COMPLETED', 'status_score': 2}
+#       ]
+#   }
+# }
+
+
 def get_status_score(status):
     if status == "RUNNING":
-        return 1
+        return 10
     elif status == "COMPLETED":
-        return 2
+        return 100
     else:
         return 0
 

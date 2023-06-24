@@ -260,16 +260,13 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     result_trace = crud.get_run_trace(db, token)
-    result_state = crud.get_run_state(db, token)
-    # result combined = crud.get_run_state_combined(db, token)
+    result_processes = crud.get_run_state_by_process(result_trace)
+    result_trace = sorted(result_trace, key=lambda obj: obj.timestamp)
     result = {
-        "result_trace": result_trace,
-        "result_state": result_state,
-        "result_combined": crud.get_run_state_information_combined(result_state),
+        "result_list": result_trace,
+        "result_processes": result_processes,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
-
-
 
 
 @app.get("/test/token/")
