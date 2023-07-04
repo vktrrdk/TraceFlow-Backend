@@ -11,7 +11,10 @@ import crud, models, schemas
 from database import SessionLocal, engine
 
 
-app = FastAPI()
+app = FastAPI(
+    title="TraceFlow",
+    # root_path="/timelessKnuth_100/proxy/8000/",
+)
 
 #"http://localhost",
 #    "http://localhost:5173/",
