@@ -1,7 +1,7 @@
 import json
 from json import JSONDecodeError
 
-from fastapi import Depends, FastAPI, Query, HTTPException
+from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -167,7 +167,6 @@ async def remove_token(token_id: str, db: Session = Depends(get_db)):
         else:
             return JSONResponse(content={"error": "No such token"}, status_code=404)
 
-
 @app.delete("/user/{user_id}/remove/token/all/")
 async def remove_user_tokens(user_id: str, db: Session = Depends(get_db)):
     """
@@ -271,6 +270,13 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
+"""
+@app.websocket("/run/{token}")
+async def websocket_test(websocket: WebSocket):
+    await websocket.accept()
+    await websocket.send_text("Test")
+"""
+        
 
 @app.get("/test/token/")
 async def get_all_tokens(db: Session = Depends(get_db)):
