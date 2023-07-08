@@ -6,7 +6,6 @@
 
 # Weitere Schritte
 
- - [ ] 
  - [ ] vererbung betrachten (models) !
  - [ ] Nochmal schauen wie die Config von nextflow angepasst werden kann, sodass man mehr metriken bekommt!
  - [ ] checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
