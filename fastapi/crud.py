@@ -179,7 +179,7 @@ def persist_trace(db: Session, json_ob, token):
 
     metadata = json_ob.get("metadata")
     if metadata is not None:
-        run_name = json_ob.get("run_name")
+        run_name = json_ob.get("runName")
         params = metadata.get("parameters")
         reference = None
         if params is not None:
