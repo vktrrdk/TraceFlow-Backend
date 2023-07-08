@@ -53,6 +53,11 @@ class RunTrace(Base):
     disk = Column(Integer, nullable=True)
     duration = Column(Integer, nullable=True)
     name = Column(String, nullable=True)
+    # to add 
+    attempt = Column(Integer, nullable=True) # attempt
+    script = Column(String, nullable=True) # script
+
+
 
 
 class RunMetadata(Base):
@@ -62,3 +67,42 @@ class RunMetadata(Base):
     run_name = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow())
     reference = Column(String, nullable=True)
+    # to add
+    command_line = Column(String, nullable=True) #commandLine
+    error_message = Column(String, nullable=True) #errorMessage
+    script_file = Column(String, nullable=True) #scriptFile
+    # all following under "stats": 
+    succeeded_count = Column(Integer, nullable=True) # succeededCount
+    # processes = list of processes, how to handle this?
+    peak_running = Column(Integer, nullable=True) # peakRunning
+    aborted = Column(Integer, nullable=True)
+    failed = Column(Integer, nullable=True)
+    peak_cpus = Column(Integer, nullable=True) # peakCPUS
+    peak_memory = Column(Integer, nullable=True) #peakMemory
+
+
+    # process in processes: 
+    """
+    index (int)
+    pending (int)
+    ignored (int)
+    loadCpus (int)
+    totalCount (int)
+    succeeded (int)
+    errored (bool)
+    running (int)
+    retries (int)
+    peakRunning (int)
+    name (string)
+    loadMemory (int)
+    stored (int)
+    terminated (bool)
+    hash (string)
+    aborted (int)
+    failed (int)
+    peakCpus (int)
+    peakMemory (int)
+    completedCount (int)
+    cached (int)
+    submitted (int)
+    """
