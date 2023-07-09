@@ -312,7 +312,15 @@ async def get_full_trace(db: Session = Depends(get_db)):
 async def get_full_meta(db: Session = Depends(get_db)):
     return crud.get_full_meta(db)
 
-@app.post("/test/run/{token_id}")
+@app.get("/test/stats/all/")
+async def get_full_stats(db: Session = Depends(get_db)):
+    return crud.get_full_stats(db)
+
+@app.get("/test/process/all/")
+async def get_processes_full(db: Session = Depends(get_db)):
+    return crud.get_full_processes(db)
+
+@app.post("/test/run/{token_id}/")
 async def read_nextflow_run(token_id: str, push: dict):
     with open(f"trace-{token_id}.json", "r") as current:
         try:
