@@ -67,6 +67,7 @@ async def create_token_for_user(user_id: str, db: Session = Depends(get_db)):
         else:
             return JSONResponse(content={"error": "An error occurred while adding the token"}, status_code=500)
 
+
 @app.post("/user/token/add")
 async def add_token_to_user(add_token_item: models.UserTokenItem, db: Session = Depends(get_db)):
     """
@@ -227,6 +228,13 @@ async def create_user(add_user_item: models.AddUserItem, db: Session = Depends(g
     result = crud.create_user(db, name=name)
     return JSONResponse(content=jsonable_encoder(result), status_code=201)
 
+
+@app.delete("/run/{token_id}")
+async def remove_run_information_for_token(token_id: str, db: Session = Depends(get_db)):
+    pass
+    """
+    TODO: implement
+    """
 
 @app.post("/run/{token_id}")
 async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depends(get_db)):
