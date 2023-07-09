@@ -32,7 +32,8 @@ def upgrade():
 
     op.create_table(
         "run_metadata",
-        sa.Column("run_id", sa.Integer(), primary_key=True),
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("run_id", sa.String()),
         sa.Column("token", sa.String()),
         sa.Column("run_name", sa.String()),
         sa.Column("timestamp", sa.DateTime(), default=sa.func.utcnow()),
@@ -46,7 +47,8 @@ def upgrade():
 
     op.create_table(
         "run_metric",
-        sa.Column("run_id", sa.Integer(), primary_key=True),
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("run_id", sa.String()),
         sa.Column("token", sa.String(), nullable=False),
         sa.Column("run_name", sa.String()),
         sa.Column("timestamp", sa.DateTime(), default=sa.func.utcnow()),
@@ -86,7 +88,7 @@ def upgrade():
         sa.Column("compute_time_fmt", sa.String(), nullable=True),
         sa.Column("cached_count", sa.Integer(), nullable=True),
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("parent_id", sa.Integer(), sa.ForeignKey("run_metadata.run_id")),
+        sa.Column("parent_id", sa.Integer(), sa.ForeignKey("run_metadata.id")),
         sa.Column("peak_running", sa.Integer(), nullable=True),
         sa.Column("succeeded_duration", sa.Integer(), nullable=True),
         sa.Column("cached_pct", sa.Float(precision=4), nullable=True),
@@ -149,7 +151,7 @@ def upgrade():
         "stat",
         "run_metadata",
         ["parent_id"],
-        ["run_id"],
+        ["id"],
     )
 
     op.create_foreign_key(

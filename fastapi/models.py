@@ -41,7 +41,8 @@ class RunToken(Base):
 
 class RunTrace(Base):
     __tablename__ = "run_metric"
-    run_id = Column(Integer, primary_key=True) #runId
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String, nullable=True) #runId
     token = Column(String, nullable=False)
     run_name = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow())
@@ -84,7 +85,7 @@ class Stat(Base):
     cached_count = Column(Integer, nullable=True) # cachedCount
     id: Mapped[int] = mapped_column(primary_key=True)
     processes: Mapped[List["Process"]] = relationship() #processes
-    parent_id: Mapped[int] = mapped_column(ForeignKey("run_metadata.run_id"))
+    parent_id: Mapped[int] = mapped_column(ForeignKey("run_metadata.id"))
     peak_running = Column(Integer, nullable=True) #peakRunning
     succeeded_duration = Column(Integer, nullable=True) # succeededDuration
     cached_pct = Column(Float(4), nullable=True) # cachedPct
@@ -144,7 +145,8 @@ class Process(Base):
 
 class RunMetadata(Base):
     __tablename__ = "run_metadata"
-    run_id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id = Column(String, nullable=True) # runId
     stats: Mapped[List["Stat"]] = relationship()
     token = Column(String)
     run_name = Column(String)
