@@ -36,6 +36,28 @@ def get_full_stats(db: Session):
 def get_full_processes(db: Session):
     return db.query(models.Process).all()
 
+def get_process_by_token(db: Session, token_id):
+    stats = get_stats_by_token(db, token_id)
+    processes = []
+    for stat in stats:
+        st = db.query(models.Process).filter(models.Process.parent_id == stat.id).all()
+        for s in st:
+            processes.append(s)
+    return processes
+    
+
+def get_stats_by_token(db: Session, token_id):
+    metas = db.query(models.RunMetadata).filter(models.RunMetadata.token == token_id).all()
+    #return db.query(models.Stat).filter(models.Stat.parent_id == token_id).all()
+    # more pythonic way for sure
+    stats = []
+    for meta in metas:
+        mt = db.query(models.Stat).filter(models.Stat.parent_id == meta.id).all()
+        for m in mt: 
+            print(1)
+            stats.append(m)
+    return stats
+
 
 def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
@@ -78,31 +100,6 @@ def get_run_state_by_process(objects):
             }
 
     return processes
-
-
-
-# {'BOWTIE':
-#   {'sub_processes':
-#       [
-#           {'name': 'Index', 'task_id': 2, 'status': 'COMPLETED', 'status_score': 2},
-#           {'name': 'Align', 'task_id': 5, 'status': 'COMPLETED', 'status_score': 2},
-#           {'name': 'Align', 'task_id': 4, 'status': 'COMPLETED', 'status_score': 2}
-#       ]
-#   },
-# 'fastqc':
-#   {'sub_processes':
-#       [
-#           {'name': None, 'task_id': 3, 'status': 'COMPLETED', 'status_score': 2},
-#           {'name': None, 'task_id': 1, 'status': 'COMPLETED', 'status_score': 2}
-#       ]
-#   },
-# 'multiqc':
-#   {'sub_processes':
-#       [
-#           {'name': None, 'task_id': 6, 'status': 'COMPLETED', 'status_score': 2}
-#       ]
-#   }
-# }
 
 
 def get_status_score(status):
@@ -271,7 +268,7 @@ def get_process_data(json_ob, stat_id):
                             "succeeded": process.get("succeeded", None),
                             "errored": process.get("errored", None),
                             "running": process.get("running", None),
-                            "retires": process.get("retries", None),
+                            "retries": process.get("retries", None),
                             "peak_running": process.get("peakRunning", None),
                             "name": process.get("name", None),
                             "task_name": process.get("taskName", None),
