@@ -1,6 +1,6 @@
 import datetime
 from typing import List
-from sqlalchemy import Column, String, DateTime, Integer, Float, ForeignKey, Boolean
+from sqlalchemy import Column, String, DateTime, Integer, Float, ForeignKey, Boolean, BigInteger
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
@@ -42,7 +42,7 @@ class RunToken(Base):
 class RunTrace(Base):
     __tablename__ = "run_metric"
     id = Column(Integer, primary_key=True)
-    run_id = Column(String, nullable=True) #runId
+    run_id = Column(String, nullable=True) # runId
     token = Column(String, nullable=False)
     run_name = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow())
@@ -51,28 +51,28 @@ class RunTrace(Base):
     process = Column(String, nullable=True)
     tag = Column(String, nullable=True)
     cpus = Column(Integer, nullable=True)
-    memory = Column(Integer, nullable=True)
-    disk = Column(Integer, nullable=True)
-    duration = Column(Integer, nullable=True)
+    memory = Column(BigInteger, nullable=True)
+    disk = Column(BigInteger, nullable=True)
+    duration = Column(BigInteger, nullable=True)
     name = Column(String, nullable=True)
     attempt = Column(Integer, nullable=True) # trace:attempt
     script = Column(String, nullable=True) # trace:script
-    time = Column(Integer, nullable=True) #trace:time
-    realtime = Column(Integer, nullable=True) # trace:realtime
+    time = Column(BigInteger, nullable=True) #trace:time
+    realtime = Column(BigInteger, nullable=True) # trace:realtime
     cpu_percentage = Column(Float(4), nullable=True) # trace:%cpu
-    rchar = Column(Integer, nullable=True) # trace:rchar
-    wchar = Column(Integer, nullable=True) # trace:wchar
-    syscr = Column(Integer, nullable=True) # trace:syscr
-    syscw = Column(Integer, nullable=True) # trace:syscw
-    read_bytes = Column(Integer, nullable=True) # trace:read_bytes
-    write_bytes = Column(Integer, nullable=True) # trace:write_bytes
+    rchar = Column(BigInteger, nullable=True) # trace:rchar
+    wchar = Column(BigInteger, nullable=True) # trace:wchar
+    syscr = Column(BigInteger, nullable=True) # trace:syscr
+    syscw = Column(BigInteger, nullable=True) # trace:syscw
+    read_bytes = Column(BigInteger, nullable=True) # trace:read_bytes
+    write_bytes = Column(BigInteger, nullable=True) # trace:write_bytes
     memory_percentage = Column(Float(4), nullable=True) # trace:%mem
-    vmem = Column(Integer, nullable=True) # trace:vmem
-    rss = Column(Integer, nullable=True) # trace:rss
-    peak_vmem = Column(Integer, nullable=True) # trace:peak_vmem
-    peak_rss = Column(Integer, nullable=True) # trace:peak_rss
-    vol_ctxt = Column(Integer, nullable=True) # trace:vol_ctxt
-    inv_ctxt = Column(Integer, nullable=True) # trace:inv_ctxt
+    vmem = Column(BigInteger, nullable=True) # trace:vmem
+    rss = Column(BigInteger, nullable=True) # trace:rss
+    peak_vmem = Column(BigInteger, nullable=True) # trace:peak_vmem
+    peak_rss = Column(BigInteger, nullable=True) # trace:peak_rss
+    vol_ctxt = Column(BigInteger, nullable=True) # trace:vol_ctxt
+    inv_ctxt = Column(BigInteger, nullable=True) # trace:inv_ctxt
     event = Column(String, nullable=True) # event
 
 
@@ -87,7 +87,7 @@ class Stat(Base):
     processes: Mapped[List["Process"]] = relationship() #processes
     parent_id: Mapped[int] = mapped_column(ForeignKey("run_metadata.id"))
     peak_running = Column(Integer, nullable=True) #peakRunning
-    succeeded_duration = Column(Integer, nullable=True) # succeededDuration
+    succeeded_duration = Column(BigInteger, nullable=True) # succeededDuration
     cached_pct = Column(Float(4), nullable=True) # cachedPct
     load_memory = Column(Integer, nullable=True) # loadMemory
     succeed_count_fmt = Column(String, nullable=True) #succedCountFmt
@@ -95,13 +95,13 @@ class Stat(Base):
     ignored_count = Column(Integer, nullable=True) #ignoredCount
     submitted_count = Column(Integer, nullable=True) #submittedCount
     running_count = Column(Integer, nullable=True) # runningCount
-    peak_memory = Column(Integer, nullable=True) # peakMemory
+    peak_memory = Column(BigInteger, nullable=True) # peakMemory
     succeed_percentage = Column(Float(4), nullable=True) #succeedPercentage
     pending_count = Column(Integer, nullable=True) # pendingCount
     load_cpus = Column(Integer, nullable=True) # loadCpus
-    cached_duration = Column(Integer, nullable=True) # cachedDuration
+    cached_duration = Column(BigInteger, nullable=True) # cachedDuration
     aborted_count = Column(Integer, nullable=True) #abortedCount
-    failed_duration = Column(Integer, nullable=True) # failedDuration
+    failed_duration = Column(BigInteger, nullable=True) # failedDuration
     failed_count = Column(Integer, nullable=True) # failedCount
     load_memory_fmt = Column(String, nullable=True) # loadMemoryFmt
     retries_count = Column(Integer, nullable=True) # retriesCount
@@ -137,7 +137,7 @@ class Process(Base):
     aborted = Column(Integer, nullable=True) #aborted
     failed = Column(Integer, nullable=True) # failed
     peak_cpus = Column(Integer, nullable=True) # peakCpus
-    peak_memory = Column(Integer, nullable=True) # peakMemory
+    peak_memory = Column(BigInteger, nullable=True) # peakMemory
     completed_count = Column(Integer, nullable=True) # completedCount
     cached = Column(Integer, nullable=True) # cached
     submitted = Column(Integer, nullable=True) # submitted

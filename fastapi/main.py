@@ -316,9 +316,19 @@ async def get_full_meta(db: Session = Depends(get_db)):
 async def get_full_stats(db: Session = Depends(get_db)):
     return crud.get_full_stats(db)
 
+@app.get("/test/stats/{token_id}/")
+async def get_stats_by_token(token_id: str, db: Session = Depends(get_db)):
+    return crud.get_stats_by_token(db, token_id)
+
+
 @app.get("/test/process/all/")
 async def get_processes_full(db: Session = Depends(get_db)):
     return crud.get_full_processes(db)
+
+@app.get("/test/process/{token_id}/")
+async def get_process_by_token(token_id: str, db: Session = Depends(get_db)):
+    return crud.get_process_by_token(db, token_id)
+
 
 @app.post("/test/run/{token_id}/")
 async def read_nextflow_run(token_id: str, push: dict):

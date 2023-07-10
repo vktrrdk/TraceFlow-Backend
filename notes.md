@@ -2,6 +2,7 @@
 
 - [ ] CloWM zum laufen bekommen
 - [x] LaTex-Template anlegen
+- [ ] DoiToBib und bibtext abchecken
 
 
 # Weitere Schritte
@@ -22,6 +23,8 @@
  - [ ] Toolkit zum laufen bringen
  - [ ] Metriken um alle Werte ergänzen
  - [ ] Beispielkonfiguration anzeigen, um trace mit allen Metriken zu ermöglichen
- - [ ] Weitere Grafiken
+ - [ ] Weitere Grafiken/Metriken
+ - [ ] Welche Metriken sind relevant? Github awesome usw auschecken https://github.com/meirwah/awesome-workflow-engines
  - [ ] Bootstrap Probleme fixen
+ - [ ] Weitere Grafiken
 
