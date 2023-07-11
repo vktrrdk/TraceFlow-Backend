@@ -89,7 +89,7 @@ class Stat(Base):
     peak_running = Column(Integer, nullable=True) #peakRunning
     succeeded_duration = Column(BigInteger, nullable=True) # succeededDuration
     cached_pct = Column(Float(4), nullable=True) # cachedPct
-    load_memory = Column(Integer, nullable=True) # loadMemory
+    load_memory = Column(BigInteger, nullable=True) # loadMemory
     succeed_count_fmt = Column(String, nullable=True) #succedCountFmt
     failed_percentage = Column(Float(4), nullable=True) #failedPct
     ignored_count = Column(Integer, nullable=True) #ignoredCount

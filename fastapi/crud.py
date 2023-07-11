@@ -58,9 +58,17 @@ def get_stats_by_token(db: Session, token_id):
             stats.append(m)
     return stats
 
+def get_meta_by_token(db: Session, token_id):
+    metas = db.query(models.RunMetadata).filter(models.RunMetadata.token == token_id).all()
+    return metas
+
 
 def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
+
+
+def get_run_trace_by_token(db: Session, token_id):
+    return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
 
 
 def get_run_state_by_process(objects):
@@ -274,8 +282,8 @@ def get_process_data(json_ob, stat_id):
                             "task_name": process.get("taskName", None),
                             "load_memory": process.get("loadMemory", None),
                             "stored": process.get("stored", None),
-                            "terminaded": process.get("terminated", None),
-                            "process_has": process.get("hash", None),
+                            "terminated": process.get("terminated", None),
+                            "process_hash": process.get("hash", None),
                             "aborted": process.get("aborted", None),
                             "peak_cpus": process.get("peakCpus", None),
                             "peak_memory": process.get("peakMemory", None),
