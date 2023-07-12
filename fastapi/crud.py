@@ -88,24 +88,11 @@ def get_run_state_by_process(objects):
         process_tasks = processes[entry.process.split(":")[0]]["tasks"]
         if entry.task_id in process_tasks:
             task = process_tasks[entry.task_id]
-            task["status"] = entry.status
-            task["status_score"] = get_status_score(entry.status)
-            task["tag"] = entry.tag
-            task["cpus"] = entry.cpus
-            task["memory"] = entry.memory
-            task["disk"] = entry.disk
-            task["duration"] = entry.duration
+            task = vars(entry)
+            task["sub_task"] = task_subname
         else:
-            process_tasks[entry.task_id] = {
-                "sub_task": task_subname,
-                "status": entry.status,
-                "status_score": get_status_score(entry.status),
-                "tag": entry.tag,
-                "cpus": entry.cpus,
-                "memory": entry.memory,
-                "disk": entry.disk,
-                "duration": entry.duration,
-            }
+            process_tasks[entry.task_id] = vars(entry)
+            process_tasks[entry.task_id]["sub_task"] = task_subname
 
     return processes
 

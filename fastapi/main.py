@@ -263,6 +263,8 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     :param token_id: The id of the run-token
     :param db:
     :return: information on run with token
+    TODO: adjust to have more structure in response data
+    Check Traces again - is there some data missing
     """
     if not token_id:
         return JSONResponse(content={"error": "No token provided"}, status_code=200)
@@ -272,9 +274,15 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     result_trace = crud.get_run_trace(db, token)
     result_processes = crud.get_run_state_by_process(result_trace)
     result_trace = sorted(result_trace, key=lambda obj: obj.timestamp)
+    result_meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
+    result_stat = crud.get_stats_by_token(db, token_id)
+    result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_list": result_trace,
         "result_processes": result_processes,
+        "result_meta": result_meta,
+        "result_stat": result_stat,
+        "result_meta_processes": result_meta_processes,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
@@ -343,6 +351,7 @@ async def read_nextflow_run(token_id: str, push: dict):
             z = json.load(current)
         except JSONDecodeError:
             print("NO NOT WORKING")
+            # TODO: reimplmenent this method to get the trace data for the toolkit - is there data missing?
             z = []
         current.close()
     with open(f"trace-{token_id}.json", "w+") as json_file:
