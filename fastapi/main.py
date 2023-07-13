@@ -273,6 +273,7 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     result_trace = crud.get_run_trace(db, token)
     result_processes = crud.get_run_state_by_process(result_trace)
+    result_by_task = crud.get_task_states_by_token(db, token_id)
     result_trace = sorted(result_trace, key=lambda obj: obj.timestamp)
     result_meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_stat = crud.get_stats_by_token(db, token_id)
@@ -283,6 +284,7 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         "result_meta": result_meta,
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
+        "result_by_task": result_by_task,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
@@ -346,17 +348,15 @@ async def get_trace_by_token(token_id: str, db: Session = Depends(get_db)):
 
 @app.post("/test/run/{token_id}/")
 async def read_nextflow_run(token_id: str, push: dict):
-    with open(f"trace-{token_id}.json", "r") as current:
-        try:
+    z = []
+    try:
+        with open(f"trace-{token_id}.json", "r+") as current:        
             z = json.load(current)
-        except JSONDecodeError:
-            print("NO NOT WORKING")
-            # TODO: reimplmenent this method to get the trace data for the toolkit - is there data missing?
-            z = []
         current.close()
+    except (JSONDecodeError,  FileNotFoundError):
+        z = []
     with open(f"trace-{token_id}.json", "w+") as json_file:
         z.append(push)
         json.dump(z, json_file)
         json_file.close()
-
 

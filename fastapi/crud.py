@@ -54,7 +54,6 @@ def get_stats_by_token(db: Session, token_id):
     for meta in metas:
         mt = db.query(models.Stat).filter(models.Stat.parent_id == meta.id).all()
         for m in mt: 
-            print(1)
             stats.append(m)
     return stats
 
@@ -67,13 +66,24 @@ def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
+def get_task_states_by_token(db: Session, token_id):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
+    traces = sorted(traces, key=lambda obj: obj.timestamp, reverse=True)
+    by_task = []
+    task_ids = []
+    for trace in traces:
+        if not trace.task_id in task_ids:
+            task_ids.append(trace.task_id)
+            by_task.append(trace)
+    return by_task
+
 def get_run_trace_by_token(db: Session, token_id):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
 
 
 def get_run_state_by_process(objects):
     processes = {}
-    objects = sorted(objects, key=lambda obj: obj.timestamp)
+    objects = sorted(objects, key=lambda obj: obj.timestamp, reverse=True)
 
     for entry in objects:
         process = entry.process.split(":")[0]
@@ -81,16 +91,12 @@ def get_run_state_by_process(objects):
             processes[process] = {"tasks": {}}
 
     for entry in objects:
-        splitted_process_name = entry.process.split(":")
+        splitted_process_name = entry.process.split(":", 1)
         task_subname = None
         if len(splitted_process_name) > 1:
             task_subname = splitted_process_name[1]
-        process_tasks = processes[entry.process.split(":")[0]]["tasks"]
-        if entry.task_id in process_tasks:
-            task = process_tasks[entry.task_id]
-            task = vars(entry)
-            task["sub_task"] = task_subname
-        else:
+        process_tasks = processes[splitted_process_name[0]]["tasks"]
+        if not entry.task_id in process_tasks:
             process_tasks[entry.task_id] = vars(entry)
             process_tasks[entry.task_id]["sub_task"] = task_subname
 
