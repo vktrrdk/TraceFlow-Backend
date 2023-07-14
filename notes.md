@@ -19,12 +19,12 @@
  - [ ] workflow management wie user --> mehrere runs für einen über einen token referenzierbaren workflow
  - [ ] websockets statt polling? --> nochmal anschauen
  - [x] github access on vm 
- - [ ] Big Integer in Datenbank an den Stellen wo es nötig ist
- - [ ] Toolkit zum laufen bringen
- - [ ] Metriken um alle Werte ergänzen
+ - [x] Big Integer in Datenbank an den Stellen wo es nötig ist
+ - [x] Toolkit zum laufen bringen
+ - [x] Metriken um alle Werte ergänzen
  - [ ] Beispielkonfiguration anzeigen, um trace mit allen Metriken zu ermöglichen
- - [ ] Weitere Grafiken/Metriken
+ - [x] Weitere Grafiken/Metriken
  - [ ] Welche Metriken sind relevant? Github awesome usw auschecken https://github.com/meirwah/awesome-workflow-engines
- - [ ] Bootstrap Probleme fixen
- - [ ] Weitere Grafiken
+ - [x] Bootstrap Probleme fixen
+
 
