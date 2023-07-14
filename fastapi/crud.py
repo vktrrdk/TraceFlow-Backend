@@ -82,8 +82,49 @@ def get_run_trace_by_token(db: Session, token_id):
 
 
 def get_run_state_by_process(objects):
-    processes = {}
     objects = sorted(objects, key=lambda obj: obj.timestamp, reverse=True)
+    processes_splitty = {}
+    for entry in objects:
+        if not entry.process in processes_splitty:
+            processes_splitty[entry.process] = [entry.task_id]
+        elif entry.task_id not in processes_splitty[entry.process]:
+            processes_splitty[entry.process].append(entry.task_id)
+    #print(processes_splitty)
+
+    processes = {}
+
+    """
+    openai distinguisher
+    result_dict = {}
+    for obj in objects:
+        name_parts = obj.name.split(":")
+        for i, part in enumerate(name_parts):
+            if i not in result_dict:
+                result_dict[i] = {}
+            if part not in result_dict[i]:
+                result_dict[i][part] = []
+            result_dict[i][part].append(obj)
+            if len(result_dict[i]) > 1:
+                break
+    print(result)
+    """
+    
+    for process in processes_splitty:
+        tasks = processes_splitty[process]
+        if process not in processes:
+            processes[process] = {"tasks": {}}
+        for task_id in tasks:
+             
+
+            latest_obj = next((x for x in objects if x.task_id == task_id), None)
+            process_tasks = processes[process]["tasks"]
+            if not task_id in process_tasks:
+                process_tasks[task_id] = vars(latest_obj)
+            # check how to adjust sub_task !
+
+    return  processes;
+    """
+    processes = {}
 
     for entry in objects:
         process = entry.process.split(":")[0]
@@ -100,7 +141,9 @@ def get_run_state_by_process(objects):
             process_tasks[entry.task_id] = vars(entry)
             process_tasks[entry.task_id]["sub_task"] = task_subname
 
+    print(processes != processes_2)
     return processes
+    """
 
 
 def get_status_score(status):
@@ -347,6 +390,7 @@ def persist_trace(db: Session, json_ob, token):
         db.add(meta_object)
         db.commit()
         db.refresh(meta_object)
+        # we want to "close" the endpoint for a certain token, when the "completed"-event get's persisted in the meta-trace
         
         stat_data = get_stat_data(json_ob, meta_object.id)
         stat_object = models.Stat(**stat_data)

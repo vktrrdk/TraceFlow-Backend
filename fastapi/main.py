@@ -279,7 +279,6 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     result_stat = crud.get_stats_by_token(db, token_id)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
-        "result_list": result_trace,
         "result_processes": result_processes,
         "result_meta": result_meta,
         "result_stat": result_stat,
