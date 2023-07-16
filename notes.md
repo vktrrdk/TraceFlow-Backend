@@ -1,30 +1,25 @@
 ### Orga
 
-- [ ] CloWM zum laufen bekommen
-- [x] LaTex-Template anlegen
-- [ ] DoiToBib und bibtext abchecken
-
-
-# Weitere Schritte
-
- - [ ] vererbung betrachten (models) !
- - [x] Nochmal schauen wie die Config von nextflow angepasst werden kann, sodass man mehr metriken bekommt!
- - [ ] checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
-
-
+ - [x] LaTex-Template anlegen
+ - [ ] CloWM zum laufen bekommen
+ - [ ] DoiToBib und bibtext abchecken
+  
 # Generell
- - [ ] lokalen use-case forcieren, einfaches schnelles lokales starten
- - [ ] schlank lassen, welcher webserver?
  - [x] flowchart für endpunkte --> verwendung des services mit CloWM
- - [ ] workflow management wie user --> mehrere runs für einen über einen token referenzierbaren workflow
- - [ ] websockets statt polling? --> nochmal anschauen
  - [x] github access on vm 
  - [x] Big Integer in Datenbank an den Stellen wo es nötig ist
  - [x] Toolkit zum laufen bringen
  - [x] Metriken um alle Werte ergänzen
+ - [x] Nochmal schauen wie die Config von nextflow angepasst werden kann, sodass man mehr metriken bekommt!
+ - [x] checken warum man meta objecte doppelt speichert/bekommt? selbes für trace?
+ - [ ] vererbung betrachten (models) !
  - [ ] Beispielkonfiguration anzeigen, um trace mit allen Metriken zu ermöglichen
- - [x] Weitere Grafiken/Metriken
  - [ ] Welche Metriken sind relevant? Github awesome usw auschecken https://github.com/meirwah/awesome-workflow-engines
- - [x] Bootstrap Probleme fixen
+ - 
 
-
+# Nächste TODOs
+ - [ ] lokalen use-case forcieren, einfaches schnelles lokales starten
+ - [ ] workflow management wie user --> mehrere runs für einen über einen token referenzierbaren workflow
+ - [ ] schlank lassen, welcher webserver?
+ - [ ] websockets statt polling? --> nochmal anschauen
+ - [ ] Daten vonseiten der Api liefern statt sie in JS zu berechnen? Wird nicht für alle gehen (dynamische Plots)
