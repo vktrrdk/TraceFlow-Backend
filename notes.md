@@ -15,7 +15,8 @@
  - [ ] vererbung betrachten (models) !
  - [ ] Beispielkonfiguration anzeigen, um trace mit allen Metriken zu ermöglichen
  - [ ] Welche Metriken sind relevant? Github awesome usw auschecken https://github.com/meirwah/awesome-workflow-engines
- - 
+ - [ ] scrape zu metriken hinzufügen - relevant für meldungen
+ - [ ] Schreiben! 
 
 # Nächste TODOs
  - [ ] lokalen use-case forcieren, einfaches schnelles lokales starten
