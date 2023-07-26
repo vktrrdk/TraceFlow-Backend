@@ -359,3 +359,16 @@ async def read_nextflow_run(token_id: str, push: dict):
         json.dump(z, json_file)
         json_file.close()
 
+@app.post("/test/tower/{token_id}/{whatever}")
+async def read_nextflow_tower_run(token_id: str, push: dict):
+    z = []
+    try:
+        with open(f"trace-tower-{token_id}.json", "r+") as current:
+            z = json.load(current)
+        current.close()
+    except(JSONDecodeError, FileNotFoundError):
+        z = []
+    with open(f"trace-tower-{token_id}.json", "w+") as json_file:
+        z.append(push)
+        json.dump(z, json_file)
+        json_file.close()

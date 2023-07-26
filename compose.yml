@@ -3,7 +3,7 @@ version: '3.5'
 services:
   nfa_db:
     image: timescale/timescaledb:2.11.0-pg15
-    container_name: nfa_db
+    container_name: nfa_db_standalone
     command: postgres -c shared_preload_libraries=timescaledb
     environment:
       - POSTGRES_USER=${POSTGRES_USER}

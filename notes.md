@@ -24,3 +24,4 @@
  - [ ] schlank lassen, welcher webserver?
  - [ ] websockets statt polling? --> nochmal anschauen
  - [ ] Daten vonseiten der Api liefern statt sie in JS zu berechnen? Wird nicht für alle gehen (dynamische Plots)
+ - [ ] feature for clown - when creating a token also return urls for persistance endpoint and for UI experience of token
