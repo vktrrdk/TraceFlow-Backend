@@ -271,11 +271,12 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     token = crud.get_token(db, token_id)
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
+    meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_trace = crud.get_run_trace(db, token)
     result_processes = crud.get_run_state_by_process(result_trace)
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_trace = sorted(result_trace, key=lambda obj: obj.timestamp)
-    result_meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
+    result_meta = meta[-1] if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
