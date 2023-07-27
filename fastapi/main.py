@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
+from Secweb import SecWeb
 from sqlalchemy.orm import Session
 
 import crud, models, schemas
@@ -13,13 +14,9 @@ from database import SessionLocal, engine
 
 app = FastAPI(
     title="TraceFlow",
-    # root_path="/timelessKnuth_100/proxy/8000/",
 )
 
-#"http://localhost",
-#    "http://localhost:5173/",
-#    "https://localhost",
-#    "https://localhost:5173/"
+SecWeb(app=app, Option={'csp': {'default-src': ["'self'"]}})
 
 origins = ["*"]
 
@@ -27,6 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 def get_db():
