@@ -16,13 +16,15 @@ app = FastAPI(
     title="TraceFlow",
 )
 
-SecWeb(app=app, Option={'csp': {'default-src': ["'self'"]}})
+# SecWeb(app=app, Option={'csp': {'default-src': ["'self'"]}})
 
-origins = ["*"]
+origins = [
+   "*"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
