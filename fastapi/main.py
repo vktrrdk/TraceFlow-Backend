@@ -250,6 +250,8 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=404)
     token = crud.get_token(db, token_id)
     if token:
+        if crud.check_for_workflow_completed(db, token_id):
+            return Response(status_code=400)
         crud.persist_trace(db, json_ob, token)
         return Response(status_code=204)
     else:

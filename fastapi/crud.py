@@ -373,14 +373,12 @@ def get_trace_data(json_obj, token_id):
     return {}
     # adjust this functions in the near future because there certainly is a more pythonic way to do this...
 
+def check_for_workflow_completed(db: Session, token_id):
+    metas = get_meta_by_token(db, token_id)
+    return any(meta.event in ['completed', 'failed'] for meta in metas)
+
+
 def persist_trace(db: Session, json_ob, token):
-    """
-    token = create_random_token()
-            db_user = models.User(id=token, name=name)
-            db.add(db_user)
-            db.commit()
-            db.refresh(db_user)
-        """
     metadata_saved = False
     trace_saved = False
     metadata = json_ob.get("metadata", None)
