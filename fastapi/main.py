@@ -163,7 +163,7 @@ async def remove_token(token_id: str, db: Session = Depends(get_db)):
     else:
         token = crud.get_token(db, token_id)
         if token:
-            result = crud.remove_token(db, token)
+            result = crud.remove_token_and_connected_information(db, token)
             return JSONResponse(content=result, status_code=200)
         else:
             return JSONResponse(content={"error": "No such token"}, status_code=404)

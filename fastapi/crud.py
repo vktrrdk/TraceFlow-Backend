@@ -179,6 +179,32 @@ def remove_token(db: Session, token):
     db.commit()
     return {"removed_token": token.id, "removed_from_user": user is not None}
 
+def remove_token_and_connected_information(db, token):
+    token_id = token.id
+    processes = get_process_by_token(db, token_id)
+    for process in processes:
+        db.delete(process)
+    db.commit()
+    stats = get_stats_by_token(db, token_id)   
+    for stat in stats:
+        db.delete(stat)
+    db.commit()
+    metas = get_meta_by_token(db, token_id)
+    for meta in metas:
+        db.delete(meta)
+    db.commit()
+    traces = get_run_trace_by_token(db, token_id)
+    for trace in traces:
+        db.delete(trace)
+    db.commit()
+    db.delete(token)
+    db.commit()
+    
+ 
+    
+   
+
+
 
 def remove_all_token_from_user(user_id: str, db: Session):
     user = get_user(db, user_id)
