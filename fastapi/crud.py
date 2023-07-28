@@ -199,7 +199,7 @@ def remove_token_and_connected_information(db, token):
     db.commit()
     db.delete(token)
     db.commit()
-    
+    return {"deleted": True}
  
     
    
@@ -393,6 +393,7 @@ def get_trace_data(json_obj, token_id):
             "vol_ctxt": trace.get("vol_ctxt", None),
             "inv_ctxt": trace.get("inv_ctxt", None),
             "event": json_obj.get("event", None),
+            "scratch": trace.get("scratch", None),
         }
 
         return trace_data
