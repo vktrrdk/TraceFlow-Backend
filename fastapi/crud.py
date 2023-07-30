@@ -66,6 +66,17 @@ def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
+def group_by_run_name(result_by_task):
+    run_name_dictionary = {}
+    for process in result_by_task:
+        if process.run_name not in run_name_dictionary:
+            run_name_dictionary[process.run_name] = [process]
+        else:
+            run_name_dictionary[process.run_name].append(process)
+
+    return run_name_dictionary
+
+
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
     traces = sorted(traces, key=lambda obj: obj.timestamp, reverse=True)
@@ -75,6 +86,10 @@ def get_task_states_by_token(db: Session, token_id):
         if not trace.task_id in task_ids:
             task_ids.append(trace.task_id)
             by_task.append(trace)
+        else:
+            tasks_with_same_id_and_name = [obj for obj in by_task if obj.task_id == trace.task_id and obj.run_name == trace.run_name]
+            if not any(obj.run_id == trace.run_id and obj.run_name == trace.run_name for obj in tasks_with_same_id_and_name):
+                by_task.append(trace);
     return by_task
 
 def get_run_trace_by_token(db: Session, token_id):
@@ -400,9 +415,10 @@ def get_trace_data(json_obj, token_id):
     return {}
     # adjust this functions in the near future because there certainly is a more pythonic way to do this...
 
-def check_for_workflow_completed(db: Session, token_id):
+def check_for_workflow_completed(db: Session, json_ob: object, token_id: string):
     metas = get_meta_by_token(db, token_id)
-    return any(meta.event in ['completed', 'failed'] for meta in metas)
+    run_id = json_ob["runId"];
+    return any(meta.event in ['completed', 'failed'] and meta.run_id == run_id for meta in metas)
 
 
 def persist_trace(db: Session, json_ob, token):

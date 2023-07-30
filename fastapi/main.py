@@ -250,7 +250,8 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=404)
     token = crud.get_token(db, token_id)
     if token:
-        if crud.check_for_workflow_completed(db, token_id):
+        print(token_id)
+        if crud.check_for_workflow_completed(db, json_ob, token_id):
             return Response(status_code=400)
         crud.persist_trace(db, json_ob, token)
         return Response(status_code=204)
@@ -274,16 +275,14 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
-    result_trace = crud.get_run_trace(db, token)
-    result_processes = crud.get_run_state_by_process(result_trace)
     result_by_task = crud.get_task_states_by_token(db, token_id)
-    result_trace = sorted(result_trace, key=lambda obj: obj.timestamp)
+    result_by_run_name = crud.group_by_run_name(result_by_task)
     result_meta = meta[-1] if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
-        "result_processes": result_processes,
         "result_meta": result_meta,
+        "result_by_run_name": result_by_run_name,
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
         "result_by_task": result_by_task,
