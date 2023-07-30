@@ -281,6 +281,7 @@ def get_metadata_data(json_ob, token_id):
             reference = params.get("reference")
     metadata_dict = {
         "command_line": command_line,
+        "run_id": run_id,
         "run_name": run_name,
         "event": event,
         "reference": reference,
@@ -418,7 +419,11 @@ def get_trace_data(json_obj, token_id):
 def check_for_workflow_completed(db: Session, json_ob: object, token_id: string):
     metas = get_meta_by_token(db, token_id)
     run_id = json_ob["runId"];
-    return any(meta.event in ['completed', 'failed'] and meta.run_id == run_id for meta in metas)
+    run_name = json_ob["runName"]
+    return any(
+        meta.event in ['completed', 'failed'] and meta.run_id == run_id and meta.run_name == run_name
+        for meta in metas
+    )
 
 
 def persist_trace(db: Session, json_ob, token):
