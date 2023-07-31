@@ -260,6 +260,7 @@ def get_metadata_data(json_ob, token_id):
     run_name = json_ob.get("runName", None)
     run_id = json_ob.get("runId", None)
     event = json_ob.get("event", None)
+    timestamp = json_ob.get("utcTime", datetime.utcnow())
     command_line = None
     error_message = None
     script_file = None
@@ -289,6 +290,7 @@ def get_metadata_data(json_ob, token_id):
         "script_file": script_file,
         "nextflow_version": nextflow_version,
         "token": token_id,
+        "timestamp": timestamp,
     }
     return metadata_dict
 
@@ -436,7 +438,6 @@ def persist_trace(db: Session, json_ob, token):
         db.add(meta_object)
         db.commit()
         db.refresh(meta_object)
-        # we want to "close" the endpoint for a certain token, when the "completed"-event get's persisted in the meta-trace
         
         stat_data = get_stat_data(json_ob, meta_object.id)
         stat_object = models.Stat(**stat_data)
