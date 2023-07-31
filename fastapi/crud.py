@@ -66,17 +66,6 @@ def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
-def group_by_run_name(result_by_task):
-    run_name_dictionary = {}
-    for process in result_by_task:
-        if process.run_name not in run_name_dictionary:
-            run_name_dictionary[process.run_name] = [process]
-        else:
-            run_name_dictionary[process.run_name].append(process)
-
-    return run_name_dictionary
-
-
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
     traces = sorted(traces, key=lambda obj: obj.timestamp, reverse=True)
@@ -396,14 +385,14 @@ def get_trace_data(json_obj, token_id):
             "script": trace.get("script", None),
             "time": trace.get("time", None),
             "realtime": trace.get("realtime", None),
-            "cpu_percentage": trace.get("%%cpu", None),
+            "cpu_percentage": trace.get("%cpu", None),
             "rchar": trace.get("rchar", None),
             "wchar": trace.get("wchar", None),
             "syscr": trace.get("syscr", None),
             "syscw": trace.get("syscw", None),
             "read_bytes": trace.get("read_bytes", None),
             "write_bytes": trace.get("write_bytes", None),
-            "memory_percentage": trace.get("%%mem", None),
+            "memory_percentage": trace.get("%mem", None),
             "vmem": trace.get("vmem", None),
             "rss": trace.get("rss", None),
             "peak_vmem": trace.get("peak_vmem", None),

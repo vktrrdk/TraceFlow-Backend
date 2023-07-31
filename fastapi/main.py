@@ -8,7 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from Secweb import SecWeb
 from sqlalchemy.orm import Session
 
-import crud, models, schemas
+import crud, models, schemas, helpers
 from database import SessionLocal, engine
 
 
@@ -274,15 +274,17 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_by_task = crud.get_task_states_by_token(db, token_id)
-    result_by_run_name = crud.group_by_run_name(result_by_task)
+    result_by_run_name = helpers.group_by_run_name(result_by_task)
     result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
+    result_analysis = helpers.analyze(result_by_run_name)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_meta": result_meta,
         "result_by_run_name": result_by_run_name,
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
+        "result_analysis": result_analysis,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
