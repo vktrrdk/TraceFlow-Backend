@@ -266,8 +266,6 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     :param token_id: The id of the run-token
     :param db:
     :return: information on run with token
-    TODO: adjust to have more structure in response data
-    Check Traces again - is there some data missing
     """
     if not token_id:
         return JSONResponse(content={"error": "No token provided"}, status_code=200)
@@ -277,7 +275,7 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_by_run_name = crud.group_by_run_name(result_by_task)
-    result_meta = meta[-1] if len(meta) > 0 else {}
+    result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
@@ -285,7 +283,6 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         "result_by_run_name": result_by_run_name,
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
-        "result_by_task": result_by_task,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
