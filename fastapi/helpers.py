@@ -82,10 +82,19 @@ def analyze(grouped_processes):
             valid, problems = get_tag_invalidities(tag, execution_duration, full_duration)
             if not valid:
                 tag_analysis.append({"tag": tag["tag"], "run_name": key, "problems": problems})
-    analysis["process_wise"] = process_analysis
-    analysis["tag_wise"] = tag_analysis
+
+    analysis["process_wise"] = group_runwise(process_analysis)
+    analysis["tag_wise"] = group_runwise(tag_analysis)
+
 
     return analysis
+
+def group_runwise(data):
+    run_groups = {}
+    for item in data: 
+        run_name = item["run_name"]
+        run_groups.setdefault(run_name, []).append(item)
+    return run_groups
 
 def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
     valid = True
@@ -130,11 +139,11 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         ratio_with_without = same_tag_duration_average / without_tag_duration_average
         if ratio_with_without > TAG_DURATION_RATIO_THRESHOLD:
             valid = False
-            problems.append({"duration_comparison_ratio": ratio_with_without})
+            problems.append({"tag_duration_comparison_ratio": ratio_with_without})
         ratio_with_full = same_tag_duration_sum / full_duration
         if ratio_with_full > TAG_DURATION_RATIO_FULL_THRESHOLD:
             valid = False
-            problems.append({"duration_to_full_ratio": ratio_with_full})
+            problems.append({"tag_duration_to_full_ratio": ratio_with_full})
     
     # cpu
 
@@ -144,7 +153,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         ratio = same_tag_cpu_allocation_average / without_tag_cpu_allocation_average
         if ratio > TAG_CPU_ALLOCATION_RATIO_THRESHOLD:
             valid = False
-            problems.append({"cpu_allocation_ratio": ratio})
+            problems.append({"tag_cpu_allocation_ratio": ratio})
 
     if len(same_tag_cpu_percentage) > 0 and len(without_tag_cpu_percentage) > 0:
         same_tag_cpu_percentage_average =  sum(same_tag_cpu_percentage) / len(same_tag_cpu_percentage)
@@ -152,7 +161,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         ratio = same_tag_cpu_percentage_average / without_tag_cpu_percentage_average
         if ratio > TAG_CPU_PERCENTAGE_RATIO_THRESHOLD:
             valid = False
-            problems.append({"cpu_percentage_ratio": ratio})
+            problems.append({"tag_cpu_percentage_ratio": ratio})
     
     # memory 
 
@@ -162,7 +171,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         ratio = same_tag_memory_average / without_tag_memory_average
         if ratio > TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD:
             valid = False
-            problems.append({"memory_ratio": ratio})
+            problems.append({"tag_memory_ratio": ratio})
 
     return valid, problems
 
