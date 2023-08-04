@@ -34,7 +34,6 @@ TOP_PERCENT_RATIO = 0.1 # 10 percent. could be set as env variable !
 LIMIT_BY_NUMBER = 10 # if 10% s more than this number, limit it
 
 
-
 def check_valid_ram_interval(process: models.RunTrace):
     if process.memory is not None and process.rss is not None:
         relative = process.rss / process.memory
@@ -56,11 +55,8 @@ def analyze(db: Session, grouped_processes):
     tag_process_mapping = []
     tag_analysis = []
 
-    #all_traces = crud.get_full_trace(db)
-    #print(all_traces[0].process)
     
-
-    per_run_bad_duration = {} # bad durations by run
+    per_run_bad_duration = {}  # bad durations by run
     per_run_process_duration_average = {}
     per_run_process_duration_sum = {}
     per_run_process_cpu_average = {}
@@ -72,7 +68,7 @@ def analyze(db: Session, grouped_processes):
         process_mapping_cpu_raw = {}
         process_mapping_allocation = {}
         process_mapping_duration = {}
-        
+
         process_cpu_allocation_average = {}
         process_cpu_raw_usage = {}
         process_cpu_raw_average = {}
@@ -80,10 +76,10 @@ def analyze(db: Session, grouped_processes):
 
         group = grouped_processes[key]
         group_dicts = [vars(process) for process in group]
-        number_of_elems_to_return = min([LIMIT_BY_NUMBER, len(group_dicts) * TOP_PERCENT_RATIO])
+        number_of_elems_to_return = min([LIMIT_BY_NUMBER, int(len(group_dicts) * TOP_PERCENT_RATIO)])
 
         # sort by duration
-        mapping_keys = ["process", "task_id", "duration"] # only retrieve these
+        mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
         duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0), reverse=True)
         duration_list = [{key: process[key] for key in mapping_keys} for process in duration_sorted_list]
         duration_sum = sum([process["duration"] for process in group_dicts])
@@ -108,7 +104,6 @@ def analyze(db: Session, grouped_processes):
         per_run_process_most_cpu_allocation[key] = cpu_allocated_most_list
         
 
-
         for process in group_dicts:
             print(process["rss"])
             if process["process"] not in process_mapping_cpu_raw:
@@ -125,14 +120,8 @@ def analyze(db: Session, grouped_processes):
                 if process["process"] not in process_mapping_duration:
                     process_mapping_duration[process["process"]] = []
                 process_mapping_duration[process["process"]].append(process["duration"])
-            
-            if process["memory"] and process["memory_percentage"]:
-                x = 0
-        
-                
-        
-        
-    
+
+
         for process, raw_usages in process_mapping_cpu_raw.items():
             process_sum = sum(raw_usages)
             average = 0
@@ -145,19 +134,13 @@ def analyze(db: Session, grouped_processes):
         print("allocation")
         for process, allocation_usages in process_mapping_allocation.items():
             print(allocation_usages)
-            # = sum(raw_usages)
-            #average = 0
-            #if len(raw_usages) > 0:
-            #    average = process_sum / len(raw_usages)
-            #process_cpu_raw_average[process] = average
-
-        # per_run_process_cpu_average[key] = process_cpu_raw_average
+            # go from here
 
 
         full_duration = []
         execution_duration = []
         for process in group:
-            if process.duration is not None: 
+            if process.duration is not None:
                 full_duration.append(process.duration)
             tags = tags_from_process(process)
             for tag in tags:
@@ -168,16 +151,18 @@ def analyze(db: Session, grouped_processes):
                 if not "processes" in map_element:
                     map_element["processes"] = []
                 map_element["processes"].append(process)
-            execution_duration.append({"process": process.process, "task_id": process.task_id, "duration": process.duration, "tags": tags})
-        
+            execution_duration.append(
+                {"process": process.process, "task_id": process.task_id, "duration": process.duration, "tags": tags})
+
         for process in group:
             process: models.RunTrace = process
-            possible_return = { "process": process.process, "task_id": process.task_id, "run_name": process.run_name, "problems": [] }
+            possible_return = {"process": process.process, "task_id": process.task_id, "run_name": process.run_name,
+                               "problems": []}
             valid, problems = get_process_invalidities(process, execution_duration)
             if not valid:
                 possible_return["problems"] = problems
                 process_analysis.append(possible_return)
-        full_duration = sum(full_duration) # there is a bug somewhere
+        full_duration = sum(full_duration)  # there is a bug somewhere
         for tag in tag_process_mapping:
             valid, problems = get_tag_invalidities(tag, execution_duration, full_duration)
             if not valid:
