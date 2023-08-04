@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-
+import sys
 from sqlalchemy.orm import Session
 import string, random
 import models, schemas, crud
@@ -29,7 +29,8 @@ TAG_CPU_ALLOCATION_RATIO_THRESHOLD = 1.5 # 150% in relation to other processes
 TAG_CPU_PERCENTAGE_RATIO_THRESHOLD = 1.5 # same
 TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD = 1.4 # 140% memory in relation to others
 
-
+LIMIT_BY_NUMBER = 10
+TOP_PERCENT_RATIO = 0.1
 
 def check_valid_ram_interval(process: models.RunTrace):
     if process.memory is not None and process.rss is not None:
@@ -71,7 +72,7 @@ def analyze(grouped_processes):
 
         group = grouped_processes[key]
         group_dicts = [vars(process) for process in group]
-        number_of_elems_to_return = min([LIMIT_BY_NUMBER, len(group_dicts) * TOP_PERCENT_RATIO])
+        number_of_elems_to_return = min([LIMIT_BY_NUMBER, int(len(group_dicts) * TOP_PERCENT_RATIO)])
 
         # sort by duration
         mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
