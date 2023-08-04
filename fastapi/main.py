@@ -277,7 +277,7 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     result_by_run_name = helpers.group_by_run_name(result_by_task)
     result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
-    result_analysis = helpers.analyze(result_by_run_name)
+    result_analysis = helpers.analyze(db, result_by_run_name)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_meta": result_meta,

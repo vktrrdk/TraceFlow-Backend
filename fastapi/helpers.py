@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+import sys
 
 from sqlalchemy.orm import Session
 import string, random
@@ -29,6 +30,9 @@ TAG_CPU_ALLOCATION_RATIO_THRESHOLD = 1.5 # 150% in relation to other processes
 TAG_CPU_PERCENTAGE_RATIO_THRESHOLD = 1.5 # same
 TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD = 1.4 # 140% memory in relation to others
 
+TOP_PERCENT_RATIO = 0.1 # 10 percent. could be set as env variable !
+LIMIT_BY_NUMBER = 10 # if 10% s more than this number, limit it
+
 
 
 def check_valid_ram_interval(process: models.RunTrace):
@@ -45,16 +49,112 @@ def check_valid_cpu_interval(process: models.RunTrace):
     return True, None
 
 
-def analyze(grouped_processes):
+def analyze(db: Session, grouped_processes):
     analysis = {}
     process_analysis = []
     tags_presave = []
     tag_process_mapping = []
     tag_analysis = []
+
+    #all_traces = crud.get_full_trace(db)
+    #print(all_traces[0].process)
     
+
+    per_run_bad_duration = {} # bad durations by run
+    per_run_process_duration_average = {}
+    per_run_process_duration_sum = {}
+    per_run_process_cpu_average = {}
+    per_run_process_least_cpu_allocation = {}
+    per_run_process_most_cpu_allocation = {}
+    per_run_process_memory_average = {}
+
     for key in grouped_processes:
-        full_duration = []
+        process_mapping_cpu_raw = {}
+        process_mapping_allocation = {}
+        process_mapping_duration = {}
+        
+        process_cpu_allocation_average = {}
+        process_cpu_raw_usage = {}
+        process_cpu_raw_average = {}
+
+
         group = grouped_processes[key]
+        group_dicts = [vars(process) for process in group]
+        number_of_elems_to_return = min([LIMIT_BY_NUMBER, len(group_dicts) * TOP_PERCENT_RATIO])
+
+        # sort by duration
+        mapping_keys = ["process", "task_id", "duration"] # only retrieve these
+        duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0), reverse=True)
+        duration_list = [{key: process[key] for key in mapping_keys} for process in duration_sorted_list]
+        duration_sum = sum([process["duration"] for process in group_dicts])
+        average_duration = duration_sum / len(group_dicts)
+        
+        worst_duration_list = duration_list[:number_of_elems_to_return]
+        per_run_bad_duration[key] = worst_duration_list
+
+        cpu_percentage_sorted_allocation_list_least = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or sys.maxsize) / (proc.get('cpus') or 0.00000001)) # is there a better wy=
+        
+        cpu_allocated_least_list = [
+            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1)} for proc in cpu_percentage_sorted_allocation_list_least
+            ][:number_of_elems_to_return]
+    
+        per_run_process_least_cpu_allocation[key] = cpu_allocated_least_list
+        
+        cpu_percentage_sorted_allocation_list_most = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or 0.000001) / (proc.get('cpus') or sys.maxsize), reverse=True)
+        cpu_allocated_most_list = [
+            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1)} for proc in cpu_percentage_sorted_allocation_list_most
+            ][:number_of_elems_to_return]
+
+        per_run_process_most_cpu_allocation[key] = cpu_allocated_most_list
+        
+
+
+        for process in group_dicts:
+            print(process["rss"])
+            if process["process"] not in process_mapping_cpu_raw:
+                process_mapping_cpu_raw[process["process"]] = []
+            if process["cpu_percentage"]:
+                process_mapping_cpu_raw[process["process"]].append(process["cpu_percentage"])
+
+            if process["process"] not in process_mapping_allocation:
+                process_mapping_allocation[process["process"]] = []
+                if process["cpu_percentage"] and process["cpus"] > 0:
+                    process_mapping_allocation[process["process"]].append(process["cpu_percentage"] / process["cpus"])
+
+            if process["duration"]:
+                if process["process"] not in process_mapping_duration:
+                    process_mapping_duration[process["process"]] = []
+                process_mapping_duration[process["process"]].append(process["duration"])
+            
+            if process["memory"] and process["memory_percentage"]:
+                x = 0
+        
+                
+        
+        
+    
+        for process, raw_usages in process_mapping_cpu_raw.items():
+            process_sum = sum(raw_usages)
+            average = 0
+            if len(raw_usages) > 0:
+                average = process_sum / len(raw_usages)
+            process_cpu_raw_average[process] = average
+
+        per_run_process_cpu_average[key] = process_cpu_raw_average
+
+        print("allocation")
+        for process, allocation_usages in process_mapping_allocation.items():
+            print(allocation_usages)
+            # = sum(raw_usages)
+            #average = 0
+            #if len(raw_usages) > 0:
+            #    average = process_sum / len(raw_usages)
+            #process_cpu_raw_average[process] = average
+
+        # per_run_process_cpu_average[key] = process_cpu_raw_average
+
+
+        full_duration = []
         execution_duration = []
         for process in group:
             if process.duration is not None: 
@@ -85,6 +185,7 @@ def analyze(grouped_processes):
 
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
+
 
 
     return analysis

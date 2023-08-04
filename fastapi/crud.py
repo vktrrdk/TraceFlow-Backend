@@ -126,7 +126,7 @@ def get_run_state_by_process(objects):
                 process_tasks[task_id] = vars(latest_obj)
             # check how to adjust sub_task !
 
-    return  processes;
+    return processes
     """
     processes = {}
 
