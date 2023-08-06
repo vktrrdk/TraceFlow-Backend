@@ -6,71 +6,72 @@ from sqlalchemy.orm import Session
 import string, random
 import models, schemas, crud
 
-def group_by_run_name(result_by_task):
-    run_name_dictionary = {}
-    for process in result_by_task:
-        if process.run_name not in run_name_dictionary:
-            run_name_dictionary[process.run_name] = [process]
-        else:
-            run_name_dictionary[process.run_name].append(process)
-
-    return run_name_dictionary
 
 """
 Analysis part
 """
-INTERVAL_VALID_RAM_RELATION = (0.6, 1.2) # from 60 to 120%
-INTERVAL_VALID_CPU_ALLOCATION_PERCENTAGE = (60, 140) # from 60 to 140%
-THRESHOLD_DURATION_RELATION = 5 # a process can run 5 times longer than the average over the others
-DURATION_TO_CONSIDER_AVERAGES_THRESHOLD = 120000 # two minutes threshold to consider only bigger processes
-DURATION_REQUESTED_RELATION_THRESHOLD = 1.3 # process can run 30% longer than requested
-TAG_DURATION_RATIO_THRESHOLD = 1.4 # processes with this tag are allowed
-TAG_DURATION_RATIO_FULL_THRESHOLD = 0.3 # processes with a certain tag are allowed to take up to 30% of full duration
-TAG_CPU_ALLOCATION_RATIO_THRESHOLD = 1.5 # 150% in relation to other processes
-TAG_CPU_PERCENTAGE_RATIO_THRESHOLD = 1.5 # same
-TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD = 1.4 # 140% memory in relation to others
+interval_valid_ram_relation = (0.6, 1.2)  # from 60 to 120%
+interval_valid_cpu_allocation_percentage = (60, 140)  # from 60 to 140%
+threshold_duration_relation = 5  # a process can run 5 times longer than the average over the others
+duration_to_consider_averages_threshold = 120000  # two minutes threshold to consider only bigger processes
+duration_requested_relation_threshold = 1.3  # process can run 30% longer than requested
+tag_duration_ratio_threshold = 1.4  # processes with this tag are allowed
+tag_duration_ratio_full_threshold = 0.3  # processes with a certain tag are allowed to take up to 30% of full duration
+tag_cpu_allocation_ratio_threshold = 1.5  # 150% in relation to other processes
+tag_cpu_percentage_ratio_threshold = 1.5  # same
+tag_memory_rss_average_ratio_threshold = 1.4  # 140% memory in relation to others
+top_percent_ratio = 0.1  # 10 percent. could be set as env variable !
+limit_processes_per_domain_by_number = 10  # if 10% s more than this number, limit it
 
-TOP_PERCENT_RATIO = 0.1  # 10 percent. could be set as env variable !
-LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER = 10  # if 10% s more than this number, limit it
-
-
-
-def check_valid_ram_interval(process: models.RunTrace):
-    if process.memory is not None and process.rss is not None:
-        relative = process.rss / process.memory
-        return INTERVAL_VALID_RAM_RELATION[0] <= relative <= INTERVAL_VALID_RAM_RELATION[1], {"ram_relative": relative}
-    return True, None
-
-def check_valid_cpu_interval(process: models.RunTrace):
-    if process.cpus:
-        if process.cpu_percentage:
-            allocation = process.cpu_percentage / process.cpus
-            return INTERVAL_VALID_CPU_ALLOCATION_PERCENTAGE[0] <= allocation <= INTERVAL_VALID_CPU_ALLOCATION_PERCENTAGE[1], {"cpu_allocation": allocation}
-    return True, None
 
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
+    
     analysis = {}
     process_analysis = []
     tags_presave = []
     tag_process_mapping = []
     tag_analysis = []
-
-    test = "ihi"
-
-    print(sys.version)
-
-
-
-
-    """
+    
     for elem in threshold_numbers.items():
-        match elem:
+        match elem[0]:
             case "interval_valid_ram_relation":
-                INTERVAL_VALID_RAM_RELATION = (0, 0)
-            case _:
-                print(elem, threshold_numbers[elem])
-    """
+                global interval_valid_ram_relation
+                interval_valid_ram_relation = elem[1]
+            case "interval_valid_cpu_relation":
+                global interval_valid_cpu_allocation_percentage
+                interval_valid_cpu_allocation_percentage = elem[1]
+            case "threshold_duration_relation":
+                global threshold_duration_relation
+                threshold_duration_relation = elem[1]
+            case "duration_to_consider_threshold":
+                global duration_to_consider_averages_threshold
+                duration_to_consider_averages_threshold = elem[1]
+            case "duration_requested_relation_relation_threshold":
+                global duration_requested_relation_threshold
+                duration_requested_relation_threshold = elem[1]
+            case "tag_duration_ratio_threshold":
+                global tag_duration_ratio_threshold
+                tag_duration_ratio_threshold = elem[1]
+            case "tag_duration_full_threshold":
+                global tag_duration_ratio_full_threshold
+                tag_duration_ratio_full_threshold = elem[1]
+            case "tag_cpu_allocation_ratio_threshold":
+                global tag_cpu_allocation_ratio_threshold
+                tag_cpu_allocation_ratio_threshold = elem[1]
+            case "tag_cpu_percentage_ratio_threshold":
+                global tag_cpu_percentage_ratio_threshold
+                tag_cpu_percentage_ratio_threshold = elem[1]
+            case "tag_memory_rss_average_ratio_threshold":
+                global tag_memory_rss_average_ratio_threshold
+                tag_memory_rss_average_ratio_threshold = elem[1]
+            case "top_percent_ratio":
+                global top_percent_ratio
+                top_percent_ratio = elem[1]
+            case "limit_processes_per_domain_by_number":
+                global limit_processes_per_domain_by_number
+                limit_processes_per_domain_by_number = elem[1]
+    
 
     
     per_run_bad_duration = {}  # bad durations by run
@@ -106,9 +107,10 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
         group = grouped_processes[key]
         group_dicts = [vars(process) for process in group]
-        check_number = min([LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER, len(group_dicts)])
-        number_of_elems_to_return = min([LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER, int(len(group_dicts) * TOP_PERCENT_RATIO)])
+        check_number = min([limit_processes_per_domain_by_number, len(group_dicts)])
+        number_of_elems_to_return = min([limit_processes_per_domain_by_number, int(len(group_dicts) * top_percent_ratio)])
         number_of_elems_to_return = max([check_number, number_of_elems_to_return])
+        print(number_of_elems_to_return)
 
         # sort by duration
         mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
@@ -287,7 +289,7 @@ def sort_values_per_run(run_duration_data, key_name, reverse=False):
         sorted_list = sorted(list_of_values, key=lambda process: process[1], reverse=reverse)
         sorted_processes = []
         for value in sorted_list:
-            if len(sorted_processes) < LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER:
+            if len(sorted_processes) < limit_processes_per_domain_by_number:
                 sorted_processes.append({"process": value[0], key_name: value[1]})
         per_run_mapping[run_name] = sorted_processes
     
@@ -342,11 +344,11 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         same_tag_duration_average = same_tag_duration_sum / len(same_tag_durations)
         without_tag_duration_average = without_tag_duration_sum / len(without_tag_durations)
         ratio_with_without = same_tag_duration_average / without_tag_duration_average
-        if ratio_with_without > TAG_DURATION_RATIO_THRESHOLD:
+        if ratio_with_without > tag_duration_ratio_threshold:
             valid = False
             problems.append({"tag_duration_comparison_ratio": ratio_with_without})
         ratio_with_full = same_tag_duration_sum / full_duration
-        if ratio_with_full > TAG_DURATION_RATIO_FULL_THRESHOLD:
+        if ratio_with_full > tag_duration_ratio_full_threshold:
             valid = False
             problems.append({"tag_duration_to_full_ratio": ratio_with_full})
     
@@ -356,7 +358,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         same_tag_cpu_allocation_average = sum(same_tag_cpu_allocation) / len(same_tag_cpu_allocation)
         without_tag_cpu_allocation_average = sum(without_tag_cpu_allocation) / len(without_tag_cpu_allocation)
         ratio = same_tag_cpu_allocation_average / without_tag_cpu_allocation_average
-        if ratio > TAG_CPU_ALLOCATION_RATIO_THRESHOLD:
+        if ratio > tag_cpu_allocation_ratio_threshold:
             valid = False
             problems.append({"tag_cpu_allocation_ratio": ratio})
 
@@ -364,7 +366,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         same_tag_cpu_percentage_average =  sum(same_tag_cpu_percentage) / len(same_tag_cpu_percentage)
         without_tag_cpu_percentage_average =  sum(without_tag_cpu_percentage) / len(without_tag_cpu_percentage)
         ratio = same_tag_cpu_percentage_average / without_tag_cpu_percentage_average
-        if ratio > TAG_CPU_PERCENTAGE_RATIO_THRESHOLD:
+        if ratio > tag_cpu_percentage_ratio_threshold:
             valid = False
             problems.append({"tag_cpu_percentage_ratio": ratio})
     
@@ -374,7 +376,7 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
         same_tag_memory_average = sum(same_tag_memory) / len(same_tag_memory)
         without_tag_memory_average = sum(without_tag_memory) / len(without_tag_memory)
         ratio = same_tag_memory_average / without_tag_memory_average
-        if ratio > TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD:
+        if ratio > tag_memory_rss_average_ratio_threshold:
             valid = False
             problems.append({"tag_memory_ratio": ratio})
 
@@ -416,34 +418,58 @@ def get_process_invalidities(process: models.RunTrace, duration_mapping):
     duration_values_within_process = [dur_obj["duration"] for dur_obj in duration_mapping if dur_obj["process"] == process.process and dur_obj["task_id"] != process.task_id and dur_obj["duration"]]
     
     if process.duration:
-        if process.duration > DURATION_TO_CONSIDER_AVERAGES_THRESHOLD:
+        if process.duration > duration_to_consider_averages_threshold:
             len_duration_wo_p = len(duration_values_without_process)
             if len_duration_wo_p > 0:
                 average_without_process = sum(duration_values_within_process) / len_duration_wo_p
-                if average_without_process > THRESHOLD_DURATION_RELATION:
+                if average_without_process > threshold_duration_relation:
                     invalidities_list.append({"duration_ratio_compared_to_other_processes": average_without_process})
                     to_return = True
 
             len_duration_wo_et = len(duration_values_without_this_explicit_task)
             if len_duration_wo_et > 0:
                 average_without_task = sum(duration_values_without_this_explicit_task) / len_duration_wo_et 
-                if average_without_task > THRESHOLD_DURATION_RELATION:
+                if average_without_task > threshold_duration_relation:
                     invalidities_list.append({"duration_ratio_compared_to_all": average_without_task})
                     to_return = True
 
             len_duration_within = len(duration_values_within_process)
             if len_duration_within:
                 average_within = sum(duration_values_within_process) / len_duration_within
-                if average_within > THRESHOLD_DURATION_RELATION:
+                if average_within > threshold_duration_relation:
                     invalidities_list.append({"duration_ratio_compared_to_same": average_within})
                     to_return = True
         if process.time:
             duration_ratio = process.duration / process.time
-            if duration_ratio > DURATION_REQUESTED_RELATION_THRESHOLD:
+            if duration_ratio > duration_requested_relation_threshold:
                 invalidities_list.append({"duration_ratio_to_requested", duration_ratio})
                 to_return = True
     return (not to_return, invalidities_list)
     
+def check_valid_ram_interval(process: models.RunTrace):
+    if process.memory is not None and process.rss is not None:
+        relative = process.rss / process.memory
+        return interval_valid_ram_relation[0] <= relative <= interval_valid_ram_relation[1], {"ram_relative": relative}
+    return True, None
+
+def check_valid_cpu_interval(process: models.RunTrace):
+    if process.cpus:
+        if process.cpu_percentage:
+            allocation = process.cpu_percentage / process.cpus
+            return interval_valid_cpu_allocation_percentage[0] <= allocation <= interval_valid_cpu_allocation_percentage[1], {"cpu_allocation": allocation}
+    return True, None
+
+def group_by_run_name(result_by_task):
+    run_name_dictionary = {}
+    for process in result_by_task:
+        if process.run_name not in run_name_dictionary:
+            run_name_dictionary[process.run_name] = [process]
+        else:
+            run_name_dictionary[process.run_name].append(process)
+
+    return run_name_dictionary
+
+
 """
 End of analysis part
 """

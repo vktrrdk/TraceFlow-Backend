@@ -272,7 +272,6 @@ async def get_run_information(token_id: str, threshold_params: dict = None, db: 
     token = crud.get_token(db, token_id)
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
-    print(threshold_params)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_by_run_name = helpers.group_by_run_name(result_by_task)
