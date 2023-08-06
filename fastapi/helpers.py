@@ -30,8 +30,9 @@ TAG_CPU_ALLOCATION_RATIO_THRESHOLD = 1.5 # 150% in relation to other processes
 TAG_CPU_PERCENTAGE_RATIO_THRESHOLD = 1.5 # same
 TAG_MEMORY_RSS_AVERAGE_RATIO_THRESHOLD = 1.4 # 140% memory in relation to others
 
-TOP_PERCENT_RATIO = 0.1 # 10 percent. could be set as env variable !
-LIMIT_BY_NUMBER = 10 # if 10% s more than this number, limit it
+TOP_PERCENT_RATIO = 0.1  # 10 percent. could be set as env variable !
+LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER = 10  # if 10% s more than this number, limit it
+
 
 
 def check_valid_ram_interval(process: models.RunTrace):
@@ -48,12 +49,28 @@ def check_valid_cpu_interval(process: models.RunTrace):
     return True, None
 
 
-def analyze(db: Session, grouped_processes):
+def analyze(db: Session, grouped_processes, threshold_numbers):
     analysis = {}
     process_analysis = []
     tags_presave = []
     tag_process_mapping = []
     tag_analysis = []
+
+    test = "ihi"
+
+    print(sys.version)
+
+
+
+
+    """
+    for elem in threshold_numbers.items():
+        match elem:
+            case "interval_valid_ram_relation":
+                INTERVAL_VALID_RAM_RELATION = (0, 0)
+            case _:
+                print(elem, threshold_numbers[elem])
+    """
 
     
     per_run_bad_duration = {}  # bad durations by run
@@ -89,13 +106,15 @@ def analyze(db: Session, grouped_processes):
 
         group = grouped_processes[key]
         group_dicts = [vars(process) for process in group]
-        number_of_elems_to_return = min([LIMIT_BY_NUMBER, int(len(group_dicts) * TOP_PERCENT_RATIO)])
+        check_number = min([LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER, len(group_dicts)])
+        number_of_elems_to_return = min([LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER, int(len(group_dicts) * TOP_PERCENT_RATIO)])
+        number_of_elems_to_return = max([check_number, number_of_elems_to_return])
 
         # sort by duration
         mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
-        duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0), reverse=True)
-        duration_list = [{key: process[key] for key in mapping_keys} for process in duration_sorted_list]
-        duration_sum = sum([process["duration"] for process in group_dicts])
+        duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0) or 0, reverse=True)
+        duration_list = [{key: process[key] for key in mapping_keys if process[key] and process[key] is not None} for process in duration_sorted_list]
+        duration_sum = sum([process["duration"] for process in group_dicts if process["duration"] is not None])
         average_duration = duration_sum / len(group_dicts)
         
         worst_duration_list = duration_list[:number_of_elems_to_return]
@@ -268,7 +287,7 @@ def sort_values_per_run(run_duration_data, key_name, reverse=False):
         sorted_list = sorted(list_of_values, key=lambda process: process[1], reverse=reverse)
         sorted_processes = []
         for value in sorted_list:
-            if len(sorted_processes) < LIMIT_BY_NUMBER:
+            if len(sorted_processes) < LIMIT_PROCESSES_PER_DOMAIN_BY_NUMBER:
                 sorted_processes.append({"process": value[0], key_name: value[1]})
         per_run_mapping[run_name] = sorted_processes
     

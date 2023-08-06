@@ -5,7 +5,6 @@ from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
-from Secweb import SecWeb
 from sqlalchemy.orm import Session
 
 import crud, models, schemas, helpers
@@ -259,11 +258,12 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=400)
 
 
-@app.get("/run/{token_id}")
-async def get_run_information(token_id: str, db: Session = Depends(get_db)):
+@app.post("/run/info/{token_id}")
+async def get_run_information(token_id: str, threshold_params: dict = None, db: Session = Depends(get_db)):
     """
     Returns all information persisted for a certain token.
     :param token_id: The id of the run-token
+    :param threshold_params: the threshold parameters
     :param db:
     :return: information on run with token
     """
@@ -272,12 +272,13 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     token = crud.get_token(db, token_id)
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
+    print(threshold_params)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_by_run_name = helpers.group_by_run_name(result_by_task)
     result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
-    result_analysis = helpers.analyze(db, result_by_run_name)
+    result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_meta": result_meta,
