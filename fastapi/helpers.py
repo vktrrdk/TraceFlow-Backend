@@ -38,7 +38,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             case "interval_valid_ram_relation":
                 global interval_valid_ram_relation
                 interval_valid_ram_relation = elem[1]
-            case "interval_valid_cpu_relation":
+            case "interval_valid_cpu_allocation_percentage":
                 global interval_valid_cpu_allocation_percentage
                 interval_valid_cpu_allocation_percentage = elem[1]
             case "threshold_duration_relation":
@@ -85,6 +85,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     # per_run_process_memory_average = {}
     per_run_process_memory_relation_average = {}
     per_run_process_memory_allocation_average = {}
+
+    per_run_cpu_ram_ratio_data = {}
 
     for key in grouped_processes:
         process_mapping_cpu_raw = {}
@@ -146,17 +148,18 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
             if process["process"] not in process_mapping_allocation:
                 process_mapping_allocation[process["process"]] = []
-                if process["cpu_percentage"] and process["cpus"] > 0:
-                    process_mapping_allocation[process["process"]].append(process["cpu_percentage"] / process["cpus"])
+            if process["cpu_percentage"] and process["cpus"] > 0:
+                process_mapping_allocation[process["process"]].append(process["cpu_percentage"] / process["cpus"])
 
             if process["duration"]:
                 if process["process"] not in process_mapping_duration:
                     process_mapping_duration[process["process"]] = []
                 process_mapping_duration[process["process"]].append(process["duration"])
             
+            
+            if process["process"] not in process_mapping_memory_percentage:
+                process_mapping_memory_percentage[process["process"]] = []
             if process["memory_percentage"]:
-                if process["process"] not in process_mapping_memory_percentage:
-                    process_mapping_memory_percentage[process["process"]] = []
                 process_mapping_memory_percentage[process["process"]].append(process["memory_percentage"])
 
             if process["rss"]:
@@ -190,7 +193,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             process_cpu_allocation_average[process] = process_average
         
         per_run_process_cpu_allocation_average[key] = process_cpu_allocation_average
-
+        
 
         for process, duration_mapping in process_mapping_duration.items():
             duration_sum = sum(duration_mapping)
@@ -225,6 +228,39 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             process_memory_relation_average[process] = average
 
         per_run_process_memory_allocation_average[key] = process_memory_relation_average
+
+        # set the data for the plot
+
+        
+        ram_cpu_relation_labels = []
+        ram_cpu_relation_data = []
+
+        for item in process_mapping_allocation:
+            if len(process_mapping_allocation[item]) > 0:
+                if len(process_mapping_memory_percentage[item]) > 0:
+                    
+                    x_vals = process_mapping_allocation[item]
+                    y_vals = process_mapping_memory_allocation[item]
+                    rel_data = {
+                        "xMin": min(x_vals),
+                        "x": sum(x_vals) / len(x_vals),
+                        "xMax": max(x_vals),
+                        "yMin": min(y_vals),
+                        "y": sum(y_vals) / len(y_vals),
+                        "yMax": max(y_vals),
+                    }
+                    
+                ram_cpu_relation_labels.append(item)
+                ram_cpu_relation_data.append(rel_data)
+
+        final_error_bar_data = {
+            "data": ram_cpu_relation_data
+        }
+
+        per_run_cpu_ram_ratio_data[key] = {
+            "labels": ram_cpu_relation_labels,
+            "data": final_error_bar_data
+        }
 
         full_duration = []
         execution_duration = []
@@ -279,6 +315,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     analysis["most_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average , 'memory_allocation', reverse=True)
     analysis["memory_relation_average"] = per_run_process_memory_relation_average
     analysis["worst_memory_relation_average"] = sort_values_per_run(per_run_process_memory_relation_average, 'memory_relation')
+
+    analysis["cpu_ram_relation_data"] = per_run_cpu_ram_ratio_data
 
     return analysis
 
