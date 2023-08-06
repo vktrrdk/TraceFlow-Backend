@@ -57,18 +57,31 @@ def analyze(db: Session, grouped_processes):
 
     
     per_run_bad_duration = {}  # bad durations by run
-    per_run_process_duration_average = {}
+    # per_run_process_duration_average = {}
     per_run_process_duration_sum = {}
+    per_run_process_duration_average = {}
     per_run_process_cpu_average = {}
+    per_run_process_cpu_allocation_average = {}
     per_run_process_least_cpu_allocation = {}
     per_run_process_most_cpu_allocation = {}
-    per_run_process_memory_average = {}
+    # per_run_process_memory_average = {}
+    per_run_process_memory_relation_average = {}
+    per_run_process_memory_allocation_average = {}
 
     for key in grouped_processes:
         process_mapping_cpu_raw = {}
         process_mapping_allocation = {}
         process_mapping_duration = {}
+        
+        process_mapping_memory_percentage = {} # memory_percentage
+        process_mapping_memory_allocation = {} # rss/mem
+        process_mapping_memory_relation = {} # rss/vmem
 
+
+        process_duration_sum = {}
+        process_duration_average = {}
+        process_memory_allocation_average = {}
+        process_memory_relation_average = {}
         process_cpu_allocation_average = {}
         process_cpu_raw_usage = {}
         process_cpu_raw_average = {}
@@ -105,7 +118,6 @@ def analyze(db: Session, grouped_processes):
         
 
         for process in group_dicts:
-            print(process["rss"])
             if process["process"] not in process_mapping_cpu_raw:
                 process_mapping_cpu_raw[process["process"]] = []
             if process["cpu_percentage"]:
@@ -120,6 +132,22 @@ def analyze(db: Session, grouped_processes):
                 if process["process"] not in process_mapping_duration:
                     process_mapping_duration[process["process"]] = []
                 process_mapping_duration[process["process"]].append(process["duration"])
+            
+            if process["memory_percentage"]:
+                if process["process"] not in process_mapping_memory_percentage:
+                    process_mapping_memory_percentage[process["process"]] = []
+                process_mapping_memory_percentage[process["process"]].append(process["memory_percentage"])
+
+            if process["rss"]:
+                if process["memory"] and process["memory"] > 0:
+                    if process["process"] not in process_mapping_memory_allocation:
+                        process_mapping_memory_allocation[process["process"]] = []
+                    process_mapping_memory_allocation[process["process"]].append(process["rss"] / process["memory"])
+
+                if process["vmem"] and process["vmem"] > 0:
+                    if process["process"] not in process_mapping_memory_relation:
+                        process_mapping_memory_relation[process["process"]] = []
+                    process_mapping_memory_relation[process["process"]].append(process["rss"] / process["vmem"])
 
 
         for process, raw_usages in process_mapping_cpu_raw.items():
@@ -129,13 +157,53 @@ def analyze(db: Session, grouped_processes):
                 average = process_sum / len(raw_usages)
             process_cpu_raw_average[process] = average
 
+
         per_run_process_cpu_average[key] = process_cpu_raw_average
 
-        print("allocation")
-        for process, allocation_usages in process_mapping_allocation.items():
-            print(allocation_usages)
-            # go from here
 
+        for process, allocation_usages in process_mapping_allocation.items():
+            process_sum = sum(allocation_usages)
+            process_average = 0
+            if len(allocation_usages) > 0:
+                process_average = process_sum  / len (allocation_usages)
+            process_cpu_allocation_average[process] = process_average
+        
+        per_run_process_cpu_allocation_average[key] = process_cpu_allocation_average
+
+
+        for process, duration_mapping in process_mapping_duration.items():
+            duration_sum = sum(duration_mapping)
+            process_average = 0
+            if len(duration_mapping) > 0:
+                process_average = duration_sum / len(duration_mapping)
+            process_duration_sum[process] = duration_sum
+            process_duration_average[process] = process_average
+
+        per_run_process_duration_sum[key] = process_duration_sum
+        per_run_process_duration_average[key] = process_duration_average
+
+        # check for process, percentage_mapping in process_mapping_memory_percentage
+
+        for process, mapping in process_mapping_memory_allocation.items():
+            m_sum = sum(mapping)
+            average = 0
+            if len(mapping) > 0:
+                average = m_sum / len(mapping)
+
+            process_memory_allocation_average[process] = average
+
+        per_run_process_memory_relation_average[key] = process_memory_allocation_average
+    
+        
+        for process, mapping in process_mapping_memory_relation.items():
+            relation_sum = sum(mapping)
+            average = 0
+            if len(mapping) > 0:
+                average = relation_sum / len(mapping)
+    
+            process_memory_relation_average[process] = average
+
+        per_run_process_memory_allocation_average[key] = process_memory_relation_average
 
         full_duration = []
         execution_duration = []
@@ -168,12 +236,44 @@ def analyze(db: Session, grouped_processes):
             if not valid:
                 tag_analysis.append({"tag": tag["tag"], "run_name": key, "problems": problems})
 
+               
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
+    
 
-
+    # analysis["process_wise"] = { key: [] for key in grouped_processes }
+    # analysis["tag_wise"] =  { key: [] for key in grouped_processes }
+        
+    analysis["bad_duration"] = per_run_bad_duration
+    analysis["least_cpu"] = per_run_process_least_cpu_allocation
+    analysis["most_cpu"] = per_run_process_most_cpu_allocation
+    analysis["cpu_average"] = per_run_process_cpu_average
+    analysis["cpu_allocation_average"] = per_run_process_cpu_allocation_average
+    analysis["duration_sum"] = per_run_process_duration_sum
+    analysis["worst_duration_sum"]=  sort_values_per_run(per_run_process_duration_sum, 'duration', reverse=True)
+    analysis["duration_average"] = per_run_process_duration_average
+    analysis["worst_duration_average"] = sort_values_per_run(per_run_process_duration_average, 'duration', reverse=True)
+    analysis["memory_allocation"] = per_run_process_memory_allocation_average
+    analysis["least_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average, 'memory_allocation')
+    analysis["most_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average , 'memory_allocation', reverse=True)
+    analysis["memory_relation_average"] = per_run_process_memory_relation_average
+    analysis["worst_memory_relation_average"] = sort_values_per_run(per_run_process_memory_relation_average, 'memory_relation')
 
     return analysis
+
+def sort_values_per_run(run_duration_data, key_name, reverse=False):
+    per_run_mapping = {}
+    for run_name, values in run_duration_data.items():
+        list_of_values = list(values.items())
+        sorted_list = sorted(list_of_values, key=lambda process: process[1], reverse=reverse)
+        sorted_processes = []
+        for value in sorted_list:
+            if len(sorted_processes) < LIMIT_BY_NUMBER:
+                sorted_processes.append({"process": value[0], key_name: value[1]})
+        per_run_mapping[run_name] = sorted_processes
+    
+    return per_run_mapping
+
 
 def group_runwise(data):
     run_groups = {}
