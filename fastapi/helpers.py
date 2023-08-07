@@ -251,8 +251,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                         "id": item,
                     }
                     
-                ram_cpu_relation_labels.append(item)
-                ram_cpu_relation_data.append(rel_data)
+                    ram_cpu_relation_labels.append(item)
+                    ram_cpu_relation_data.append(rel_data)
 
         final_error_bar_data = {
             "data": ram_cpu_relation_data,
