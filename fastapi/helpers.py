@@ -166,12 +166,12 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                 if process["memory"] and process["memory"] > 0:
                     if process["process"] not in process_mapping_memory_allocation:
                         process_mapping_memory_allocation[process["process"]] = []
-                    process_mapping_memory_allocation[process["process"]].append(process["rss"] / process["memory"])
+                    process_mapping_memory_allocation[process["process"]].append((process["rss"] / process["memory"]) * 100)
 
                 if process["vmem"] and process["vmem"] > 0:
                     if process["process"] not in process_mapping_memory_relation:
                         process_mapping_memory_relation[process["process"]] = []
-                    process_mapping_memory_relation[process["process"]].append(process["rss"] / process["vmem"])
+                    process_mapping_memory_relation[process["process"]].append((process["rss"] / process["vmem"]) * 100)
 
 
         for process, raw_usages in process_mapping_cpu_raw.items():
@@ -248,13 +248,15 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                         "yMin": min(y_vals),
                         "y": sum(y_vals) / len(y_vals),
                         "yMax": max(y_vals),
+                        "id": item,
                     }
                     
                 ram_cpu_relation_labels.append(item)
                 ram_cpu_relation_data.append(rel_data)
 
         final_error_bar_data = {
-            "data": ram_cpu_relation_data
+            "data": ram_cpu_relation_data,
+            "label": "CPU - RAM ratio",
         }
 
         per_run_cpu_ram_ratio_data[key] = {
@@ -297,9 +299,6 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
     
-
-    # analysis["process_wise"] = { key: [] for key in grouped_processes }
-    # analysis["tag_wise"] =  { key: [] for key in grouped_processes }
         
     analysis["bad_duration"] = per_run_bad_duration
     analysis["least_cpu"] = per_run_process_least_cpu_allocation
