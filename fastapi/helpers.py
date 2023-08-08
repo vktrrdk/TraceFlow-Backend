@@ -162,6 +162,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             if process["memory_percentage"]:
                 process_mapping_memory_percentage[process["process"]].append(process["memory_percentage"])
 
+
             if process["rss"]:
                 if process["memory"] and process["memory"] > 0:
                     if process["process"] not in process_mapping_memory_allocation:
@@ -237,7 +238,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
         for item in process_mapping_allocation:
             if len(process_mapping_allocation[item]) > 0:
-                if len(process_mapping_memory_percentage[item]) > 0:
+                if item in process_mapping_memory_allocation and len(process_mapping_memory_allocation[item]) > 0:
                     
                     x_vals = process_mapping_allocation[item]
                     y_vals = process_mapping_memory_allocation[item]
