@@ -257,6 +257,11 @@ def get_metadata_data(json_ob, token_id):
     nextflow_version = None
     reference = None
     nextflow_version = None
+    scratch = json_ob.get("scratch", None)
+    project_name = None
+    revision = None
+    work_dir = None
+    user_name = None
 
     params = metadata.get("parameters", None)
     workflow = metadata.get("workflow", None)
@@ -264,9 +269,13 @@ def get_metadata_data(json_ob, token_id):
         command_line = workflow.get("commandLine", None)
         error_message = workflow.get("errorMessage", None)
         script_file =  workflow.get("script_file", None)
-        manifest = workflow.get("manifest", None)
-        if manifest is not None:
-            nextflow_version = manifest.get("nextflowVersion", None)
+        nextflow_version = workflow.get("nextflow", None)
+        project_name = workflow.get("project_name", None)
+        revision = workflow.get("revision", None)
+        work_dir = workflow.get("workDir", None)
+        user_name = workflow.get("userName", None)
+        if nextflow_version:
+            nextflow_version = nextflow_version.get("version", None)
         if params is not None:
             reference = params.get("reference")
     metadata_dict = {
@@ -280,6 +289,11 @@ def get_metadata_data(json_ob, token_id):
         "nextflow_version": nextflow_version,
         "token": token_id,
         "timestamp": timestamp,
+        "scratch": scratch, 
+        "project_name": project_name,
+        "revision": revision,
+        "work_dir": work_dir,
+        "user_name": user_name,
     }
     return metadata_dict
 

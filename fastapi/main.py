@@ -15,7 +15,6 @@ app = FastAPI(
     title="TraceFlow",
 )
 
-# SecWeb(app=app, Option={'csp': {'default-src': ["'self'"]}})
 
 origins = [
    "*"

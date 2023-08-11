@@ -157,6 +157,13 @@ class RunMetadata(Base):
     command_line = Column(String, nullable=True) #commandLine
     error_message = Column(String, nullable=True) #errorMessage
     script_file = Column(String, nullable=True) #scriptFile
-    
     event = Column(String, nullable=True) # head of json not metadata
     nextflow_version = Column(String, nullable=True) # metadata:workflow:nextflow:version
+    # new
+    scratch = Column(String, nullable=True) # metadata:scratch
+    project_name = Column(String, nullable=True) #metadata:workflow:projectName
+    revision = Column(String, nullable=True) #metadata:workflow:revision
+    work_dir = Column(String, nullable=True) #metadata:workflow:workDir
+    user_name = Column(String, nullable=True) #metadata:workflow:userName
+
+ 
