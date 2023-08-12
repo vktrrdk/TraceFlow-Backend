@@ -24,6 +24,91 @@ top_percent_ratio = 0.1  # 10 percent. could be set as env variable !
 limit_processes_per_domain_by_number = 10  # if 10% s more than this number, limit it
 
 
+def calculate_scores(db: Session, grouped_processes, threshold_numbers):
+    RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
+    scores_for_run = {}
+    # threshold numbers to be used later on
+    for run_name in grouped_processes:
+        scores_for_run[run_name] = {"task_scores": {}, "process_scores": {}}
+        task_scores = {}
+        cpu_allocation_scores = {}
+        ram_allocation_scores = {}
+        duration = {}
+        memory_requested = {}
+        cpus_requested = {}
+        run = grouped_processes[run_name]
+        all_cpu_alloc_values = []
+        all_memory_alloc_values = []
+        for task in run:
+            tid = task.task_id
+            proc_name = task.process
+            if task.cpus and task.cpus > 0 and task.cpu_percentage:
+                cpu_alloc_score = task.cpu_percentage / task.cpus
+                cpu_allocation_scores[tid] = {"process": proc_name, "value": cpu_alloc_score}
+                cpus_requested[tid] = {"process": proc_name, "value": task.cpus}
+                all_cpu_alloc_values.append(cpu_alloc_score)
+            if task.memory and task.memory > 0 and task.rss:
+                ram_alloc_score = task.rss / task.memory
+                ram_allocation_scores[tid] = {"process": proc_name, "value": ram_alloc_score}
+                memory_requested[tid] = {"process": proc_name, "value": task.memory}
+                all_memory_alloc_values.append(ram_alloc_score)
+            if task.realtime and task.realtime > 0:
+                duration[tid] = {"process": proc_name, "value": task.realtime}
+        
+        min_cpu_alloc, max_cpu_alloc = 0, 1000 # just assume
+
+
+        for task_id in cpu_allocation_scores:
+            t_val_cpu = cpu_allocation_scores[task_id]["value"]
+            if (max_cpu_alloc - t_val_cpu) == 0:
+                t_val_cpu = t_val_cpu + 1e-10
+            cpu_allocation_scores[task_id]["value"] = (t_val_cpu - min_cpu_alloc) / (max_cpu_alloc - t_val_cpu)
+        
+        min_mem_alloc, max_mem_alloc = 0, 10
+        for task_id in ram_allocation_scores:
+            t_val_mem = ram_allocation_scores[task_id]["value"]
+            if (max_mem_alloc - t_val_mem) == 0:
+                t_val_mem = t_val_mem + 1e-10
+            ram_allocation_scores[task_id]["value"] = (t_val_mem - min_mem_alloc) / (max_mem_alloc - t_val_mem)
+
+        cpu_key_list, ram_key_list = list(cpu_allocation_scores.keys()), list(ram_allocation_scores.keys())
+        scoreable_task_ids = [key for key in cpu_key_list if key in ram_key_list]
+        for task_id in scoreable_task_ids:
+            weighted_cpu_score = CPU_WEIGHT * (1 - abs((cpu_allocation_scores[task_id]["value"]) - 1 ))
+            weighted_ram_score = RAM_WEIGHT * (1 - abs((ram_allocation_scores[task_id]["value"]) - 1 ))
+            task_scores[task_id] = weighted_cpu_score + weighted_ram_score
+        weighted_scoreable_key_list = [key for key in scoreable_task_ids if key in duration]
+        scores_for_run[run_name]["task_scores"] = task_scores
+        weighted_process_scores = {}
+        for task_id in weighted_scoreable_key_list:
+            process_name = duration[task_id]["process"]
+            if process_name not in weighted_process_scores:
+                weighted_process_scores[process_name] = []
+            cpu_score = (1 - abs((cpu_allocation_scores[task_id]["value"]) - 1 ))
+            ram_score = (1 - abs((ram_allocation_scores[task_id]["value"]) - 1 ))
+            cpu_requ_value = cpus_requested[task_id]["value"]
+            mem_requ_value = memory_requested[task_id]["value"]
+            dur_value = duration[task_id]["value"]
+            value_numerator = (cpu_score * cpu_requ_value + ram_score * mem_requ_value) * dur_value
+            value_denominator = (cpu_requ_value + mem_requ_value) * dur_value
+            weighted_process_scores[process_name].append({"numerator": value_numerator, "denominator": value_denominator})
+        
+        per_process_scores = {}
+
+        for process in weighted_process_scores:
+            numerator_sum = sum(calculated['numerator'] for calculated in weighted_process_scores[process])
+            denominator_sum = sum(calculated['denominator'] for calculated in weighted_process_scores[process])
+            result = numerator_sum / denominator_sum
+            per_process_scores[process] = result
+
+        scores_for_run[run_name]["process_scores"] = per_process_scores # check if this can be calculated differently
+
+        # TODO: describe these values with equations in the thesis
+
+
+    return scores_for_run
+
+
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
     
@@ -112,7 +197,6 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         check_number = min([limit_processes_per_domain_by_number, len(group_dicts)])
         number_of_elems_to_return = min([limit_processes_per_domain_by_number, int(len(group_dicts) * top_percent_ratio)])
         number_of_elems_to_return = max([check_number, number_of_elems_to_return])
-        print(number_of_elems_to_return)
 
         # sort by duration
         mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
@@ -238,7 +322,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
         for item in process_mapping_allocation:
             if len(process_mapping_allocation[item]) > 0:
-                if item in process_mapping_memory_allocation and len(process_mapping_memory_allocation[item]) > 0:
+                if item in process_mapping_memory_allocation and    len(process_mapping_memory_allocation[item]) > 0:
                     
                     x_vals = process_mapping_allocation[item]
                     y_vals = process_mapping_memory_allocation[item]
