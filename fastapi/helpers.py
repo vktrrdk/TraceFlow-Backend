@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 import sys
+import math
 
 from sqlalchemy.orm import Session
 import string, random
@@ -27,7 +28,8 @@ limit_processes_per_domain_by_number = 10  # if 10% s more than this number, lim
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
     RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
     scores_for_run = {}
-    full_run_scores = {}
+    plain_values = {}
+
     # threshold numbers to be used later on
     for run_name in grouped_processes:
         scores_for_run[run_name] = {"task_scores": {}, "process_scores": {}}
@@ -40,21 +42,38 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         run = grouped_processes[run_name]
         all_cpu_alloc_values = []
         all_memory_alloc_values = []
+        plain_values[run_name] = {}
+       
         
         number_of_tasks = len(run)
 
 
         for task in run:
             tid = task.task_id
+            plain_values[run_name][tid] = {}
+            plain_values[run_name][tid]["duration"] = task.realtime
+            plain_values[run_name][tid]["process"] = task.process
             proc_name = task.process
             if task.cpus and task.cpus > 0 and task.cpu_percentage:
-                cpu_alloc_score = (task.cpu_percentage / task.cpus) / 100
+                
+                cpu_alloc_score = (task.cpu_percentage / task.cpus)
+                plain_values[run_name][tid]["cpu_allocation"] = cpu_alloc_score
+                plain_values[run_name][tid]["cpus"] = task.cpus
+                plain_values[run_name][tid]["cpu_percentage"] = task.cpu_percentage
+
+                cpu_alloc_score = cpu_alloc_score / 100
                 cpu_alloc_score = abs(1 - cpu_alloc_score)
                 cpu_allocation_scores[tid] = {"process": proc_name, "value": cpu_alloc_score}
                 cpus_requested[tid] = {"process": proc_name, "value": task.cpus}
                 all_cpu_alloc_values.append(cpu_alloc_score)
+        
             if task.memory and task.memory > 0 and task.rss:
                 ram_alloc_score = task.rss / task.memory # no division with 100, as ratio is already [0, 1]
+
+                plain_values[run_name][tid]["ram_allocation"] = ram_alloc_score * 100
+                plain_values[run_name][tid]["memory"] = task.memory
+                plain_values[run_name][tid]["rss"] = task.rss
+
                 ram_alloc_score = abs(1 - ram_alloc_score)
                 ram_allocation_scores[tid] = {"process": proc_name, "value": ram_alloc_score}
                 memory_requested[tid] = {"process": proc_name, "value": task.memory}
@@ -62,6 +81,8 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             if task.realtime and task.realtime > 0:
                 duration[tid] = {"process": proc_name, "value": task.realtime}
         
+        plain_values[run_name]
+
         if len(all_cpu_alloc_values) > 0: 
             min_cpu_alloc, max_cpu_alloc = 0, max(all_cpu_alloc_values)
 
@@ -111,15 +132,16 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         full_workflow_score = sum(task_scores.values()) / number_of_tasks
         scores_for_run[run_name]["full_run_score"] = full_workflow_score
 
+
         # TODO: describe these values with equations in the thesis
 
-
+    scores_for_run["detail"] = plain_values
     return scores_for_run
 
 
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
-    
+    result_scores = calculate_scores(db, grouped_processes, threshold_numbers)
     analysis = {}
     process_analysis = []
     tags_presave = []
@@ -182,6 +204,9 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     per_run_cpu_ram_ratio_data = {}
 
     for key in grouped_processes:
+        max_cpu_requested_value = 0
+        max_memory_available = 0
+
         process_mapping_cpu_raw = {}
         process_mapping_allocation = {}
         process_mapping_duration = {}
@@ -233,6 +258,9 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         
 
         for process in group_dicts:
+            if process["cpus"] and process["cpus"] > 0:
+                if process["cpus"] > max_cpu_requested_value:
+                    max_cpu_requested_value = process["cpus"]
             if process["process"] not in process_mapping_cpu_raw:
                 process_mapping_cpu_raw[process["process"]] = []
             if process["cpu_percentage"]:
@@ -253,6 +281,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                 process_mapping_memory_percentage[process["process"]] = []
             if process["memory_percentage"]:
                 process_mapping_memory_percentage[process["process"]].append(process["memory_percentage"])
+            
 
 
             if process["rss"]:
@@ -265,7 +294,11 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                     if process["process"] not in process_mapping_memory_relation:
                         process_mapping_memory_relation[process["process"]] = []
                     process_mapping_memory_relation[process["process"]].append((process["rss"] / process["vmem"]) * 100)
+            if process["memory_percentage"] and process["rss"]:
+                if max_memory_available == 0:
+                    max_memory_available = process["rss"] * (1 / (process["memory_percentage"] / 100))
 
+                
 
         for process, raw_usages in process_mapping_cpu_raw.items():
             process_sum = sum(raw_usages)
@@ -357,37 +390,21 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             "data": final_error_bar_data
         }
 
-        full_duration = []
-        execution_duration = []
-        for process in group:
-            if process.duration is not None:
-                full_duration.append(process.duration)
-            tags = tags_from_process(process)
-            for tag in tags:
-                if tag not in tags_presave:
-                    tags_presave.append(tag)
-                    tag_process_mapping.append({"tag": tag})
-                map_element = next((tag_map for tag_map in tag_process_mapping if tag_map["tag"] == tag))
-                if not "processes" in map_element:
-                    map_element["processes"] = []
-                map_element["processes"].append(process)
-            execution_duration.append(
-                {"process": process.process, "task_id": process.task_id, "duration": process.duration, "tags": tags})
+        stuff = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_cpu_requested_value})
 
-        for process in group:
+
+        """        for process in group:
+            
             process: models.RunTrace = process
             possible_return = {"process": process.process, "task_id": process.task_id, "run_name": process.run_name,
-                               "problems": []}
+                               "problems": [], score: result_scores}
             valid, problems = get_process_invalidities(process, execution_duration)
             if not valid:
                 possible_return["problems"] = problems
-                process_analysis.append(possible_return)
-        full_duration = sum(full_duration)  # there is a bug somewhere
-        for tag in tag_process_mapping:
-            valid, problems = get_tag_invalidities(tag, execution_duration, full_duration)
-            if not valid:
-                tag_analysis.append({"tag": tag["tag"], "run_name": key, "problems": problems})
-
+            process_analysis.append(possible_return)
+        #full_duration = sum(full_duration)  # there is a bug somewhere
+        """
+    
                
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
@@ -409,6 +426,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     analysis["worst_memory_relation_average"] = sort_values_per_run(per_run_process_memory_relation_average, 'memory_relation')
 
     analysis["cpu_ram_relation_data"] = per_run_cpu_ram_ratio_data
+    analysis["workflow_scores"] = result_scores
+
 
     return analysis
 
@@ -433,7 +452,9 @@ def group_runwise(data):
         run_groups.setdefault(run_name, []).append(item)
     return run_groups
 
-
+"""
+not in use at the moment
+"""
 def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
     valid = True
     problems = []
@@ -529,9 +550,37 @@ def tags_from_process(process: models.RunTrace):
     return pairs
 
 
+def get_process_invalidities(details_for_run, comparison_values):
+    """
+    needs thresholds!
+    """
+    for x in details_for_run:
+        task_details = details_for_run[x]
+        task_details["problems"] = []
+        if task_details["cpus"] and task_details["cpu_allocation"]:
+            full_cpus_float = task_details["cpu_percentage"] / 100
+            full_cpus = math.ceil(full_cpus_float)
+            if task_details["cpu_allocation"] > 100: # check these calculations - we dont only want to consider the float-integer difference, make it more clear...
+                if task_details["cpus"] < comparison_values["max_cpu"]: # 
+                    if full_cpus > comparison_values["max_cpu"]:
+                        if full_cpus_float - full_cpus > 0.2: # replace with other threshold value
+                            task_details["problems"].append({{"cpu": "more", "restriction": None, "solution": "more_cpu_assign"}})
+                        # else: FITS
+                            # task_details["problems"].append({"cpu": "fits", "r"})
+                    else:
+                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": "more_cpu_resources"})
+            else:
+                if x:  # TODO: IMPLEMENT IT
+                    pass
 
 
-def get_process_invalidities(process: models.RunTrace, duration_mapping):
+            
+    return details_for_run
+
+"""
+ not used at the moment
+"""
+def OLD_get_process_invalidities(process: models.RunTrace, duration_mapping):
     invalidities_list = []
     to_return = False
     ram_valid, problems = check_valid_ram_interval(process)
@@ -576,6 +625,7 @@ def get_process_invalidities(process: models.RunTrace, duration_mapping):
                 invalidities_list.append({"duration_ratio_to_requested", duration_ratio})
                 to_return = True
     return (not to_return, invalidities_list)
+
     
 def check_valid_ram_interval(process: models.RunTrace):
     if process.memory is not None and process.rss is not None:
