@@ -277,7 +277,6 @@ async def get_run_information(token_id: str, threshold_params: dict = None, db: 
     result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
     result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
-    result_scores = helpers.calculate_scores(db, result_by_run_name, threshold_params)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_meta": result_meta,
@@ -285,7 +284,6 @@ async def get_run_information(token_id: str, threshold_params: dict = None, db: 
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
         "result_analysis": result_analysis,
-        "result_scores": result_scores,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 

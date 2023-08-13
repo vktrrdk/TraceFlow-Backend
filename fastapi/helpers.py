@@ -390,7 +390,9 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             "data": final_error_bar_data
         }
 
-        stuff = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_cpu_requested_value})
+        result_scores['detail'][key] = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_cpu_requested_value})
+        print(result_scores['detail'][key])
+        result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items()]
 
 
         """        for process in group:
@@ -558,22 +560,27 @@ def get_process_invalidities(details_for_run, comparison_values):
         task_details = details_for_run[x]
         task_details["problems"] = []
         if task_details["cpus"] and task_details["cpu_allocation"]:
-            full_cpus_float = task_details["cpu_percentage"] / 100
-            full_cpus = math.ceil(full_cpus_float)
-            if task_details["cpu_allocation"] > 100: # check these calculations - we dont only want to consider the float-integer difference, make it more clear...
+            cpus_needed_float = task_details["cpu_percentage"] / 100
+            full_cpus_needed = math.ceil(cpus_needed_float)
+            global interval_valid_cpu_allocation_percentage
+            lower_limit_cpu, upper_limit_cpu = interval_valid_cpu_allocation_percentage
+
+            if task_details["cpu_allocation"] > upper_limit_cpu: 
                 if task_details["cpus"] < comparison_values["max_cpu"]: # 
-                    if full_cpus > comparison_values["max_cpu"]:
-                        if full_cpus_float - full_cpus > 0.2: # replace with other threshold value
-                            task_details["problems"].append({{"cpu": "more", "restriction": None, "solution": "more_cpu_assign"}})
-                        # else: FITS
-                            # task_details["problems"].append({"cpu": "fits", "r"})
+                    if full_cpus_needed > comparison_values["max_cpu"]:
+                        if cpus_needed_float - full_cpus_needed > 0.2: # replace with other threshold value
+                            task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}})
+                        
                     else:
-                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": "more_cpu_resources"})
-            else:
-                if x:  # TODO: IMPLEMENT IT
-                    pass
-
-
+                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"resources": "cpu_up"}})
+            elif task_details["cpu_allocation"] < lower_limit_cpu:
+                
+                if task_details["cpus"] > 1: 
+                    if full_cpus_needed == task_details["cpus"]:
+                        full_cpus_needed = full_cpus_needed - 1
+                    task_details["problems"].append({"cpu": "less", "restriction": None, "solution": {"cpus": full_cpus_needed}})
+                else:
+                    task_details["problems"].append({"cpu": "less", "restriction": "min_reached", "solution": {"process": "split"}})
             
     return details_for_run
 
