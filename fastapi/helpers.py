@@ -13,6 +13,7 @@ Analysis part
 """
 interval_valid_ram_relation = (0.6, 1.2)  # from 60 to 120%
 interval_valid_cpu_allocation_percentage = (60, 140)  # from 60 to 140%
+interval_valid_ram_allocation = (60, 100)
 threshold_duration_relation = 5  # a process can run 5 times longer than the average over the others
 duration_to_consider_averages_threshold = 120000  # two minutes threshold to consider only bigger processes
 duration_requested_relation_threshold = 1.3  # process can run 30% longer than requested
@@ -232,9 +233,11 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         number_of_elems_to_return = max([check_number, number_of_elems_to_return])
 
         # sort by duration
-        mapping_keys = ["process", "task_id", "duration"]  # only retrieve these
+        mapping_keys = ["process", "task_id", "duration", "tag"]  # only retrieve these
         duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0) or 0, reverse=True)
-        duration_list = [{key: process[key] for key in mapping_keys if process[key] and process[key] is not None} for process in duration_sorted_list]
+        duration_list = [{key: process[key] for key in mapping_keys if key in process} for process in duration_sorted_list]
+        for task in duration_list:
+            task['tag'] = tags_from_string(task['tag'])
         duration_sum = sum([process["duration"] for process in group_dicts if process["duration"] is not None])
         average_duration = duration_sum / len(group_dicts)
         
@@ -334,7 +337,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
         # check for process, percentage_mapping in process_mapping_memory_percentage
 
-        for process, mapping in process_mapping_memory_allocation.items():
+        for process, mapping in process_mapping_memory_relation.items():
             m_sum = sum(mapping)
             average = 0
             if len(mapping) > 0:
@@ -342,10 +345,10 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
             process_memory_allocation_average[process] = average
 
-        per_run_process_memory_relation_average[key] = process_memory_allocation_average
+        per_run_process_memory_relation_average[key] = process_memory_relation_average
     
         
-        for process, mapping in process_mapping_memory_relation.items():
+        for process, mapping in process_mapping_memory_allocation.items():
             relation_sum = sum(mapping)
             average = 0
             if len(mapping) > 0:
@@ -353,7 +356,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     
             process_memory_relation_average[process] = average
 
-        per_run_process_memory_allocation_average[key] = process_memory_relation_average
+        per_run_process_memory_allocation_average[key] = process_memory_allocation_average
 
         # set the data for the plot
 
@@ -537,10 +540,13 @@ def get_tag_invalidities(tag_obj, execution_duration_mapping, full_duration):
 
 def tags_from_process(process: models.RunTrace):
     tags = process.tag
-    if tags is None or tags == '':
+    return tags_from_string(tags)
+
+def tags_from_string(str: string):
+    if str is None or str == '':
         return [{'_': None}]
     pairs = []
-    splitted = tags.split(',')
+    splitted = str.split(',')
     for splitted_string in splitted:
         splitted_string = splitted_string
         pair = splitted_string.split(':')
@@ -549,7 +555,6 @@ def tags_from_process(process: models.RunTrace):
         else:
             pairs.append({'_': pair[0].strip()})
     return pairs
-
 
 def get_process_invalidities(details_for_run, comparison_values):
     """
@@ -586,15 +591,15 @@ def get_process_invalidities(details_for_run, comparison_values):
         if "ram_allocation" in task_details and "memory" in task_details and "rss" in task_details:
             mem_alloc_percentage = task_details["ram_allocation"]
             used_physical = task_details["rss"]
-            global interval_valid_ram_relation
-            lower_limit_ram, upper_limit_ram = interval_valid_ram_relation
+            global interval_valid_ram_allocation
+            lower_limit_ram, upper_limit_ram = interval_valid_ram_allocation
             if mem_alloc_percentage < lower_limit_ram:
                 task_details["problems"].append({"ram": "less", "restriction": None, "solution": {"ram": transfer_ram_limit(used_physical)}})
             elif mem_alloc_percentage > upper_limit_ram:
                 restriction = None
                 if used_physical > comparison_values["max_ram"]:
                     restriction = "max_reached"
-                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True) }})
+                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True), "available": comparison_values["max_ram"] }})
             
           
     return details_for_run
