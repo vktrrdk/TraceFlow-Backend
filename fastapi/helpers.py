@@ -390,9 +390,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             "data": final_error_bar_data
         }
 
-        result_scores['detail'][key] = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_cpu_requested_value})
-        print(result_scores['detail'][key])
-        result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items()]
+        result_scores['detail'][key] = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_memory_available})
+        result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items() if tid in result_scores[key]['task_scores']]
 
 
         """        for process in group:
@@ -559,20 +558,22 @@ def get_process_invalidities(details_for_run, comparison_values):
     for x in details_for_run:
         task_details = details_for_run[x]
         task_details["problems"] = []
-        if task_details["cpus"] and task_details["cpu_allocation"]:
+        if "cpus" in task_details and "cpu_allocation" in task_details:
             cpus_needed_float = task_details["cpu_percentage"] / 100
             full_cpus_needed = math.ceil(cpus_needed_float)
             global interval_valid_cpu_allocation_percentage
             lower_limit_cpu, upper_limit_cpu = interval_valid_cpu_allocation_percentage
 
             if task_details["cpu_allocation"] > upper_limit_cpu: 
+                if cpus_needed_float - full_cpus_needed > 0.2: # replace with other threshold value
+                    full_cpus_needed = full_cpus_needed + 1
                 if task_details["cpus"] < comparison_values["max_cpu"]: # 
                     if full_cpus_needed > comparison_values["max_cpu"]:
-                        if cpus_needed_float - full_cpus_needed > 0.2: # replace with other threshold value
-                            task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}})
+                       
+                        task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}})
                         
                     else:
-                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"resources": "cpu_up"}})
+                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"needed": full_cpus_needed, "available": comparison_values["max_cpu"]}})
             elif task_details["cpu_allocation"] < lower_limit_cpu:
                 
                 if task_details["cpus"] > 1: 
@@ -581,8 +582,31 @@ def get_process_invalidities(details_for_run, comparison_values):
                     task_details["problems"].append({"cpu": "less", "restriction": None, "solution": {"cpus": full_cpus_needed}})
                 else:
                     task_details["problems"].append({"cpu": "less", "restriction": "min_reached", "solution": {"process": "split"}})
+
+        if "ram_allocation" in task_details and "memory" in task_details and "rss" in task_details:
+            mem_alloc_percentage = task_details["ram_allocation"]
+            used_physical = task_details["rss"]
+            global interval_valid_ram_relation
+            lower_limit_ram, upper_limit_ram = interval_valid_ram_relation
+            if mem_alloc_percentage < lower_limit_ram:
+                task_details["problems"].append({"ram": "less", "restriction": None, "solution": {"ram": transfer_ram_limit(used_physical)}})
+            elif mem_alloc_percentage > upper_limit_ram:
+                restriction = None
+                if used_physical > comparison_values["max_ram"]:
+                    restriction = "max_reached"
+                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True) }})
             
+          
     return details_for_run
+
+def transfer_ram_limit(ram_in_bytes, up=False):
+    gib_value_float = ram_in_bytes / (math.pow(1024,3))
+    gib_value_full_lower = math.floor(gib_value_float)
+    gib_value_full_higher = math.ceil(gib_value_float)
+    if gib_value_float - gib_value_full_lower <  gib_value_full_higher - gib_value_float or up:
+        return gib_value_full_higher * math.pow(1024, 3)
+    else:
+        return gib_value_full_lower * math.pow(1024, 3)
 
 """
  not used at the moment
