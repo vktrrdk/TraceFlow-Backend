@@ -86,6 +86,8 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
 
         if len(all_cpu_alloc_values) > 0: 
             min_cpu_alloc, max_cpu_alloc = 0, max(all_cpu_alloc_values)
+            if max_cpu_alloc == 0:
+                max_cpu_alloc = sys.float_info.epsilon
 
             for task_id in cpu_allocation_scores:
                 t_val_cpu = cpu_allocation_scores[task_id]["value"]
@@ -94,6 +96,8 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
 
         if len(all_memory_alloc_values) > 0: 
             min_mem_alloc, max_mem_alloc = 0, max(all_memory_alloc_values)
+            if max_mem_alloc == 0:
+                max_mem_alloc = sys.float_info.epsilon
             for task_id in ram_allocation_scores:
                 t_val_mem = ram_allocation_scores[task_id]["value"]
                 ram_allocation_scores[task_id]["value"] = (t_val_mem - min_mem_alloc) / (max_mem_alloc - min_mem_alloc)

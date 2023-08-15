@@ -1,3 +1,4 @@
 vuejs/node_modules
 vuejs/env
 fastapi/venv
+fastapi/__pycache__
