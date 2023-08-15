@@ -69,6 +69,11 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
                 all_cpu_alloc_values.append(cpu_alloc_score)
         
             if task.memory and task.memory > 0 and task.rss:
+                if task.memory_percentage:
+                    factor = task.memory_percentage / 100
+                    available_mem = task.rss / factor
+                    plain_values[run_name][tid]["available_ram"] = math.ceil(available_mem)
+
                 ram_alloc_score = task.rss / task.memory # no division with 100, as ratio is already [0, 1]
 
                 plain_values[run_name][tid]["ram_allocation"] = ram_alloc_score * 100
@@ -398,20 +403,10 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         }
 
         result_scores['detail'][key] = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_memory_available})
+        for tid, task_with_problems in result_scores['detail'][key].items():
+            if len(task_with_problems['problems']) > 0:
+                task_with_problems['problems'] = sorted(task_with_problems['problems'], key=lambda problem: problem["severity"], reverse=True)
         result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items() if tid in result_scores[key]['task_scores']]
-
-
-        """        for process in group:
-            
-            process: models.RunTrace = process
-            possible_return = {"process": process.process, "task_id": process.task_id, "run_name": process.run_name,
-                               "problems": [], score: result_scores}
-            valid, problems = get_process_invalidities(process, execution_duration)
-            if not valid:
-                possible_return["problems"] = problems
-            process_analysis.append(possible_return)
-        #full_duration = sum(full_duration)  # there is a bug somewhere
-        """
     
                
     analysis["process_wise"] = group_runwise(process_analysis)
@@ -579,18 +574,18 @@ def get_process_invalidities(details_for_run, comparison_values):
                 if task_details["cpus"] < comparison_values["max_cpu"]: # 
                     if full_cpus_needed > comparison_values["max_cpu"]:
                        
-                        task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}})
+                        task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}, "severity": get_cpu_severity(task_details)})
                         
                     else:
-                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"needed": full_cpus_needed, "available": comparison_values["max_cpu"]}})
+                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"needed": full_cpus_needed, "available": comparison_values["max_cpu"]}, "severity": get_cpu_severity(task_details)})
             elif task_details["cpu_allocation"] < lower_limit_cpu:
                 
                 if task_details["cpus"] > 1: 
                     if full_cpus_needed == task_details["cpus"]:
                         full_cpus_needed = full_cpus_needed - 1
-                    task_details["problems"].append({"cpu": "less", "restriction": None, "solution": {"cpus": full_cpus_needed}})
+                    task_details["problems"].append({"cpu": "less", "restriction": None, "solution": {"cpus": full_cpus_needed}, "severity": get_cpu_severity(task_details)})
                 else:
-                    task_details["problems"].append({"cpu": "less", "restriction": "min_reached", "solution": {"process": "split"}})
+                    task_details["problems"].append({"cpu": "less", "restriction": "min_reached", "solution": {"process": "split"}, "severity": get_cpu_severity(task_details)})
 
         if "ram_allocation" in task_details and "memory" in task_details and "rss" in task_details:
             mem_alloc_percentage = task_details["ram_allocation"]
@@ -598,12 +593,12 @@ def get_process_invalidities(details_for_run, comparison_values):
             global interval_valid_ram_allocation
             lower_limit_ram, upper_limit_ram = interval_valid_ram_allocation
             if mem_alloc_percentage < lower_limit_ram:
-                task_details["problems"].append({"ram": "less", "restriction": None, "solution": {"ram": transfer_ram_limit(used_physical)}})
+                task_details["problems"].append({"ram": "less", "restriction": None, "solution": {"ram": transfer_ram_limit(used_physical)}, "severity": get_memory_severity(task_details)})
             elif mem_alloc_percentage > upper_limit_ram:
                 restriction = None
                 if used_physical > comparison_values["max_ram"]:
                     restriction = "max_reached"
-                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True), "available": comparison_values["max_ram"] }})
+                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True), "available": comparison_values["max_ram"] }, "severity": get_memory_severity(task_details)})
             
           
     return details_for_run
@@ -616,6 +611,18 @@ def transfer_ram_limit(ram_in_bytes, up=False):
         return gib_value_full_higher * math.pow(1024, 3)
     else:
         return gib_value_full_lower * math.pow(1024, 3)
+
+def get_cpu_severity(information):
+    return get_minutes(information["duration"]) * information["cpus"] * abs(100 - information["cpu_allocation"])
+
+def get_memory_severity(information):
+    return get_minutes(information["duration"]) * get_gibs(information["rss"]) * abs(100 - information["ram_allocation"])
+
+def get_minutes(milliseconds):
+    return milliseconds / 60000
+
+def get_gibs(bytes):
+    return bytes / 1073741824
 
 """
  not used at the moment
