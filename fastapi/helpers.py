@@ -54,6 +54,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             plain_values[run_name][tid] = {}
             plain_values[run_name][tid]["duration"] = task.realtime
             plain_values[run_name][tid]["process"] = task.process
+            plain_values[run_name][tid]["tag"] = task.tag
             proc_name = task.process
 
             # need to make clear, that in the first step, the alloc_score is the differnce - more like the "penalty" instead of a score.
@@ -143,7 +144,8 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
 
         scores_for_run[run_name]["process_scores"] = per_process_scores # check if this can be calculated differently
 
-        full_workflow_score = sum(task_scores.values()) / number_of_tasks
+
+        full_workflow_score = sum(task_scores.values()) / len(task_scores.values())
         scores_for_run[run_name]["full_run_score"] = full_workflow_score
 
 

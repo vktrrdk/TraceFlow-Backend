@@ -62,6 +62,14 @@ def get_meta_by_token(db: Session, token_id):
     return metas
 
 
+def set_all_tasks_running(db: Session, token_id):
+    trace_for_token = get_run_trace_by_token(db, token_id)
+    for token in trace_for_token:
+        token.status = "RUNNING"
+    db.commit()
+    return True
+
+
 def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 

@@ -345,6 +345,10 @@ async def get_process_by_token(token_id: str, db: Session = Depends(get_db)):
 async def get_trace_by_token(token_id: str, db: Session = Depends(get_db)):
     return crud.get_run_trace_by_token(db, token_id)
 
+@app.get("/test/trace/running/{token_id}/")
+async def adjust_trace_to_running(token_id: str, db: Session = Depends(get_db)):
+    return crud.set_all_tasks_running(db, token_id)
+
 @app.post("/test/run/{token_id}/")
 async def read_nextflow_run(token_id: str, push: dict):
     z = []
