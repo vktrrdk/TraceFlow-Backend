@@ -55,6 +55,9 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             plain_values[run_name][tid]["duration"] = task.realtime
             plain_values[run_name][tid]["process"] = task.process
             proc_name = task.process
+
+            # need to make clear, that in the first step, the alloc_score is the differnce - more like the "penalty" instead of a score.
+            
             if task.cpus and task.cpus > 0 and task.cpu_percentage:
                 
                 cpu_alloc_score = (task.cpu_percentage / task.cpus)
@@ -90,7 +93,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         plain_values[run_name]
 
         if len(all_cpu_alloc_values) > 0: 
-            min_cpu_alloc, max_cpu_alloc = 0, max(all_cpu_alloc_values)
+            min_cpu_alloc, max_cpu_alloc = 0, max([5, max(all_cpu_alloc_values)]) 
             if max_cpu_alloc == 0:
                 max_cpu_alloc = sys.float_info.epsilon
 
@@ -98,9 +101,10 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
                 t_val_cpu = cpu_allocation_scores[task_id]["value"]
                 cpu_allocation_scores[task_id]["value"] = (t_val_cpu - min_cpu_alloc) / (max_cpu_alloc - min_cpu_alloc)
         
+        # TODO adjust the normalization
 
         if len(all_memory_alloc_values) > 0: 
-            min_mem_alloc, max_mem_alloc = 0, max(all_memory_alloc_values)
+            min_mem_alloc, max_mem_alloc = 0, max([5, max(all_memory_alloc_values)])
             if max_mem_alloc == 0:
                 max_mem_alloc = sys.float_info.epsilon
             for task_id in ram_allocation_scores:
