@@ -410,7 +410,9 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                 task_with_problems['problems'] = sorted(task_with_problems['problems'], key=lambda problem: problem["severity"], reverse=True)
         result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items() if tid in result_scores[key]['task_scores']]
     
-               
+    """
+    CONSIDER THIS: (sum_over_all_tasks ((w_1 * r_t_1 * a_t_1 * d) + (w_2 * r_t_2 * a_t_2 * d))) / (sum_over_all_tasks (w_1 * a_t_1 * d) + (w_2 * a_t_2 * d))
+    """           
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
     
