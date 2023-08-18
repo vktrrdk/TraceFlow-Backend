@@ -206,14 +206,12 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
     
     per_run_bad_duration = {}  # bad durations by run
-    # per_run_process_duration_average = {}
     per_run_process_duration_sum = {}
     per_run_process_duration_average = {}
     per_run_process_cpu_average = {}
     per_run_process_cpu_allocation_average = {}
     per_run_process_least_cpu_allocation = {}
     per_run_process_most_cpu_allocation = {}
-    # per_run_process_memory_average = {}
     per_run_process_memory_relation_average = {}
     per_run_process_memory_allocation_average = {}
 
@@ -262,19 +260,18 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         cpu_percentage_sorted_allocation_list_least = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or sys.maxsize) / (proc.get('cpus') or 0.00000001)) # is there a better wy=
         
         cpu_allocated_least_list = [
-            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1)} for proc in cpu_percentage_sorted_allocation_list_least
+            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1), "tag": proc["tag"]} for proc in cpu_percentage_sorted_allocation_list_least
             ][:number_of_elems_to_return]
     
         per_run_process_least_cpu_allocation[key] = cpu_allocated_least_list
         
         cpu_percentage_sorted_allocation_list_most = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or 0.000001) / (proc.get('cpus') or sys.maxsize), reverse=True)
         cpu_allocated_most_list = [
-            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1)} for proc in cpu_percentage_sorted_allocation_list_most
+            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1), "tag": proc["tag"]} for proc in cpu_percentage_sorted_allocation_list_most
             ][:number_of_elems_to_return]
 
         per_run_process_most_cpu_allocation[key] = cpu_allocated_most_list
         
-
         for process in group_dicts:
             if process["cpus"] and process["cpus"] > 0:
                 if process["cpus"] > max_cpu_requested_value:
@@ -307,7 +304,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                     if process["process"] not in process_mapping_memory_allocation:
                         process_mapping_memory_allocation[process["process"]] = []
                     process_mapping_memory_allocation[process["process"]].append((process["rss"] / process["memory"]) * 100)
-
+            
                 if process["vmem"] and process["vmem"] > 0:
                     if process["process"] not in process_mapping_memory_relation:
                         process_mapping_memory_relation[process["process"]] = []
@@ -357,7 +354,6 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             average = 0
             if len(mapping) > 0:
                 average = m_sum / len(mapping)
-
             process_memory_allocation_average[process] = average
 
         per_run_process_memory_relation_average[key] = process_memory_relation_average
