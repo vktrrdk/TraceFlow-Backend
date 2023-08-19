@@ -42,7 +42,7 @@ def calculate_raw_scores_per_task(reduced_task):
     if reduced_task['memory'] and reduced_task['memory'] > 0 and reduced_task['rss']:
         memory_alloc = reduced_task['rss'] / reduced_task['memory']
         reduced_task['memory_allocation'] = memory_alloc * 100
-        reduced_task['raw_cpu_allocation'] = abs(1 - memory_alloc)
+        reduced_task['raw_memory_penalty'] = abs(1 - memory_alloc)
     else:
         reduced_task['memory_allocation'] = 0
         reduced_task['raw_memory_penalty'] = 1
@@ -52,20 +52,34 @@ def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min
     # normalized_penalty = (t_val_mem - min_mem_alloc) / (max_mem_alloc - min_mem_alloc)
     # RAM_WEIGHT * (1 - ram_allocation_scores[task_id]["value"])
     normalized_cpu_penalty = (task['raw_cpu_penalty'] - min_cpu) / (max_cpu - min_cpu)
-    weighted_cpu_score = w_cpu * (1 - normalized_penalty)
+    weighted_cpu_score = w_cpu * (1 - normalized_cpu_penalty)
     task['weighted_cpu_score'] = weighted_cpu_score
     normalized_memory_penalty = (task['raw_memory_penalty'] - min_ram) / (max_ram - min_ram)
     weighted_memory_score = w_ram * (1 - normalized_memory_penalty)
     task['weighted_memory_score'] = weighted_memory_score
-    task['pure_score'] = weighted_cpu_score * weighted_memory_score
+    task['pure_score'] = weighted_cpu_score + weighted_memory_score
+    task['weight_cpu'] = w_cpu
+    task['weight_memory'] = w_ram
     return task
 
+def calculate_weighted_scores(tasks):
+    nominator_sum = 0
+    denominator_sum = 0
+    for task in tasks:
+        if task['weighted_cpu_score'] and task['cpus'] and task['weighted_memory_score'] and task['memory'] and task['realtime']:
+            nominator_sum = nominator_sum + (task['weighted_cpu_score'] * task['cpus'] + task['weighted_memory_score'] * task['memory'] ) * task['realtime']
+            denominator_sum = denominator_sum + (task['weight_cpu'] * task['cpus'] + task['weight_memory'] * task['memory']) * task['realtime']
+    
+    if denominator_sum == 0:
+        return 0
+    else:
+        return nominator_sum / denominator_sum
 
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
     # check if we can propagate the weight numbers!
+    # TODO: CHECK ALL CALCULATIONS AND ADJUST FURTHER PARTS
     
     RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
-    task_scores_per_run = {}
     process_scores_per_run = {}
     full_score_per_run = {}
     raw_task_information_per_run = {}
@@ -85,10 +99,23 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         memory_alloc_values = [(task_information.get('memory_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
         min_ram_alloc, max_ram_alloc = 0, max([5, max(cpu_alloc_values)]) # max 5 times the ram requested or more
         
+        normalized_task_information_per_run[run_name] = []
         for task in raw_task_information_per_run[run_name]:
             task_with_score = calculate_normalized_score_for_run(task, CPU_WEIGHT, RAM_WEIGHT, min_cpu_alloc, max_cpu_alloc, min_ram_alloc, max_ram_alloc)
-            print(f"mem_score: {task_with_score['weighted_cpu_score']}")
+            normalized_task_information_per_run[run_name].append(task_with_score)
+        
+        process_scores_per_run[run_name] = {}
+        distinct_process_names = list(set([task['process'] for task in normalized_task_information_per_run[run_name]]))
+        for process in distinct_process_names:
+            tasks_by_process = [task for task in normalized_task_information_per_run[run_name] if task['process'] == process]
+            process_scores_per_run[run_name][process] = calculate_weighted_scores(tasks_by_process)
+        
+        full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
+        print(process_scores_per_run)
+        print(full_score_per_run)
 
+
+    
         """
             if task.cpus and task.cpus > 0 and task.cpu_percentage:
                 
