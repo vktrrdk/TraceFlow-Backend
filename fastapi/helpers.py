@@ -25,40 +25,71 @@ tag_memory_rss_average_ratio_threshold = 1.4  # 140% memory in relation to other
 top_percent_ratio = 0.1  # 10 percent. could be set as env variable !
 limit_processes_per_domain_by_number = 10  # if 10% s more than this number, limit it
 
+def get_relevant_information_per_task(task):
+    task_dict = task.__dict__
+    relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'realtime', 'cpu_percentage', 'rss']
+    task_to_return = {rel_key: task_dict[rel_key] for rel_key in relevant_keys}
+    return task_to_return
+
+def calculate_raw_scores_per_task(reduced_task):
+    if reduced_task['cpus'] and reduced_task['cpus'] > 0 and reduced_task['cpu_percentage']:
+        cpu_alloc = reduced_task['cpu_percentage'] / reduced_task['cpus']
+        reduced_task['cpu_allocation'] = cpu_alloc
+        reduced_task['raw_cpu_penalty'] = abs(1 - (cpu_alloc / 100))
+    else:
+        reduced_task['cpu_allocation'] = 0
+        reduced_task['raw_cpu_penalty'] = 1
+    if reduced_task['memory'] and reduced_task['memory'] > 0 and reduced_task['rss']:
+        memory_alloc = reduced_task['rss'] / reduced_task['memory']
+        reduced_task['memory_allocation'] = memory_alloc * 100
+        reduced_task['raw_cpu_allocation'] = abs(1 - memory_alloc)
+    else:
+        reduced_task['memory_allocation'] = 0
+        reduced_task['raw_memory_penalty'] = 1
+    return reduced_task
+
+def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min_ram, max_ram):
+    # normalized_penalty = (t_val_mem - min_mem_alloc) / (max_mem_alloc - min_mem_alloc)
+    # RAM_WEIGHT * (1 - ram_allocation_scores[task_id]["value"])
+    normalized_cpu_penalty = (task['raw_cpu_penalty'] - min_cpu) / (max_cpu - min_cpu)
+    weighted_cpu_score = w_cpu * (1 - normalized_penalty)
+    task['weighted_cpu_score'] = weighted_cpu_score
+    normalized_memory_penalty = (task['raw_memory_penalty'] - min_ram) / (max_ram - min_ram)
+    weighted_memory_score = w_ram * (1 - normalized_memory_penalty)
+    task['weighted_memory_score'] = weighted_memory_score
+    task['pure_score'] = weighted_cpu_score * weighted_memory_score
+    return task
+
 
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
+    # check if we can propagate the weight numbers!
+    
     RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
-    scores_for_run = {}
-    plain_values = {}
+    task_scores_per_run = {}
+    process_scores_per_run = {}
+    full_score_per_run = {}
+    raw_task_information_per_run = {}
+    normalized_task_information_per_run = {}
 
     # threshold numbers to be used later on
     for run_name in grouped_processes:
-        scores_for_run[run_name] = {"task_scores": {}, "process_scores": {}}
-        task_scores = {}
-        cpu_allocation_scores = {}
-        ram_allocation_scores = {}
-        duration = {}
-        memory_requested = {}
-        cpus_requested = {}
-        run = grouped_processes[run_name]
-        all_cpu_alloc_values = []
-        all_memory_alloc_values = []
-        plain_values[run_name] = {}
-       
+        run_tasks = grouped_processes[run_name]
+        raw_task_information_per_run[run_name] = []
+        for task in run_tasks:
+            reduced_task = get_relevant_information_per_task(task)
+            task_with_scores = calculate_raw_scores_per_task(reduced_task)
+            raw_task_information_per_run[run_name].append(task_with_scores)
+    
+        cpu_alloc_values = [(task_information.get('cpu_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
+        min_cpu_alloc, max_cpu_alloc = 0, max([5, max(cpu_alloc_values)]) # max 10 times the cpus needed or more 
+        memory_alloc_values = [(task_information.get('memory_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
+        min_ram_alloc, max_ram_alloc = 0, max([5, max(cpu_alloc_values)]) # max 5 times the ram requested or more
         
-        number_of_tasks = len(run)
+        for task in raw_task_information_per_run[run_name]:
+            task_with_score = calculate_normalized_score_for_run(task, CPU_WEIGHT, RAM_WEIGHT, min_cpu_alloc, max_cpu_alloc, min_ram_alloc, max_ram_alloc)
+            print(f"mem_score: {task_with_score['weighted_cpu_score']}")
 
-
-        for task in run:
-            tid = task.task_id
-            plain_values[run_name][tid] = {}
-            plain_values[run_name][tid]["duration"] = task.realtime
-            plain_values[run_name][tid]["process"] = task.process
-            plain_values[run_name][tid]["tag"] = task.tag
-            proc_name = task.process
-
-            # need to make clear, that in the first step, the alloc_score is the differnce - more like the "penalty" instead of a score.
-            
+        """
             if task.cpus and task.cpus > 0 and task.cpu_percentage:
                 
                 cpu_alloc_score = (task.cpu_percentage / task.cpus)
@@ -90,6 +121,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
                 all_memory_alloc_values.append(ram_alloc_score)
             if task.realtime and task.realtime > 0:
                 duration[tid] = {"process": proc_name, "value": task.realtime}
+            
         
         plain_values[run_name]
 
@@ -145,14 +177,18 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         scores_for_run[run_name]["process_scores"] = per_process_scores # check if this can be calculated differently
 
 
-        full_workflow_score = sum(task_scores.values()) / len(task_scores.values())
+        if len(task_scores.values()) > 0:
+            full_workflow_score = sum(task_scores.values()) / len(task_scores.values())
+        else:
+            full_workflow_score = 0
         scores_for_run[run_name]["full_run_score"] = full_workflow_score
 
 
         # TODO: describe these values with equations in the thesis
 
-    scores_for_run["detail"] = plain_values
-    return scores_for_run
+                            scores_for_run["detail"] = plain_values
+                return scores_for_run
+        """
 
 
 
