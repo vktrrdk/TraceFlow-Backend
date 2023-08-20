@@ -62,7 +62,7 @@ def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min
     task['weight_memory'] = w_ram
     return task
 
-def calculate_weighted_scores(tasks):
+def calculate_weighted_scores(tasks, process_name=None):
     nominator_sum = 0
     denominator_sum = 0
     for task in tasks:
@@ -71,13 +71,15 @@ def calculate_weighted_scores(tasks):
             denominator_sum = denominator_sum + (task['weight_cpu'] * task['cpus'] + task['weight_memory'] * task['memory']) * task['realtime']
     
     if denominator_sum == 0:
-        return 0
+        score = 0
     else:
-        return nominator_sum / denominator_sum
+        score =nominator_sum / denominator_sum
+    if process_name:
+        return {"process": process_name, "score": score}
+    else:
+        return score
 
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
-    # check if we can propagate the weight numbers!
-    # TODO: CHECK ALL CALCULATIONS AND ADJUST FURTHER PARTS
     RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
     process_scores_per_run = {}
     full_score_per_run = {}
@@ -112,20 +114,6 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
 
     return {"task_information": normalized_task_information_per_run, "process_scores": process_scores_per_run, "full_scores": full_score_per_run}
-
-
-"""
-{'task_id': 9, 'process': 'wDereplication:wDereplicateFile:_wDereplicate:pDumpLogs', 'run_name': 'small_ramanujan', 'cpus': 1,
- 'tag': 'ID: test3_bin.1, Output: test3_bin.1, LogLevel: 0', 'memory': None, 'duration': 125, 'vmem': 0,
- 'realtime': 6, 'cpu_percentage': 161.5, 'rss': 0, 'cpu_allocation': 161.5, 'raw_cpu_penalty': 0.615, 'memory_allocation': 0,
- 'raw_memory_penalty': 1, 'weighted_cpu_score': 0.47627863920388797, 'weighted_memory_score': 0.4614286816323382, 
- 'pure_score': 0.9377073208362261, 'weight_cpu': 0.5, 'weight_memory': 0.5},
- {'task_id': 21, 'process': 'wDereplication:wDereplicateFile:_wDereplicate:_wSansDereplication:pSANS', 'run_name': 'small_ramanujan', 
- 'cpus': 7, 'tag': 'Cluster 1', 'memory': 15032385536, 'duration': 1600, 'vmem': 18821120, 
- 'realtime': 1030, 'cpu_percentage': 83.6, 'rss': 3305472, 'cpu_allocation': 11.942857142857141, 'raw_cpu_penalty': 0.8805714285714286, 
- 'memory_allocation': 0.021989004952566966, 'raw_memory_penalty': 0.9997801099504743, 'weighted_cpu_score': 0.46603519908310465,
- 'weighted_memory_score': 0.46143716308144433, 'pure_score': 0.927472362164549, 'weight_cpu': 0.5, 'weight_memory': 0.5}
-"""
 
 def get_per_process_worst_rss_ratios(process_name, tasks):
     ratios = [1 if task['vmem'] == 0 else task['rss'] / task['vmem'] for task in tasks if task['rss'] and task['vmem']]
