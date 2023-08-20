@@ -62,7 +62,7 @@ def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min
     task['weight_memory'] = w_ram
     return task
 
-def calculate_weighted_scores(tasks, process_name=None):
+def calculate_weighted_scores(tasks, process_name=None, limits={}):
     nominator_sum = 0
     denominator_sum = 0
     for task in tasks:
@@ -73,9 +73,12 @@ def calculate_weighted_scores(tasks, process_name=None):
     if denominator_sum == 0:
         score = 0
     else:
-        score =nominator_sum / denominator_sum
+        score = nominator_sum / denominator_sum
     if process_name:
-        return {"process": process_name, "score": score}
+        return {
+            "process": process_name, "score": score, 
+            "problems": get_process_invalidities(tasks, limits["max_cpu_requested"], limits["max_memory"], limits["max_memory_requested"])
+        }
     else:
         return score
 
@@ -88,13 +91,27 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
 
     # threshold numbers to be used later on
     for run_name in grouped_processes:
+        max_cpu_requested = 0
+        available_memory = 0
+        available_rss = 0
+        max_memory_requested = 0
         run_tasks = grouped_processes[run_name]
         raw_task_information_per_run[run_name] = []
         for task in run_tasks:
             reduced_task = get_relevant_information_per_task(task)
             task_with_scores = calculate_raw_scores_per_task(reduced_task)
             raw_task_information_per_run[run_name].append(task_with_scores)
-    
+            if task.cpus and task.cpus > max_cpu_requested:
+                max_cpu_requested = task.cpus
+            if task.memory and task.memory > max_memory_requested:
+                max_memory_requested = task.memory
+            if task.rss and task.rss > available_rss:
+                available_rss = task.rss
+            if available_memory == 0 and task.memory_percentage and task.memory_percentage > 0 and task.rss and task.rss > 0:
+                available_memory = (100 / task.memory_percentage) * task.rss
+            available_memory = max([available_memory, available_rss])
+
+        limits = {"max_cpu_requested": max_cpu_requested, "max_memory_requested": max_memory_requested, "max_memory": available_memory}
         cpu_alloc_values = [(task_information.get('cpu_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
         min_cpu_alloc, max_cpu_alloc = 0, max([5, max(cpu_alloc_values)]) # max 10 times the cpus needed or more 
         memory_alloc_values = [(task_information.get('memory_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
@@ -109,7 +126,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         distinct_process_names = list(set([task['process'] for task in normalized_task_information_per_run[run_name]]))
         for process in distinct_process_names:
             tasks_by_process = [task for task in normalized_task_information_per_run[run_name] if task['process'] == process]
-            process_scores_per_run[run_name].append({"process": process, 'score': calculate_weighted_scores(tasks_by_process)})
+            process_scores_per_run[run_name].append(calculate_weighted_scores(tasks_by_process, process, limits))
         
         full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
 
@@ -132,6 +149,60 @@ def get_per_process_cpu_allocation_results(process_name, tasks):
 
     return {"deviation_sum": sum_penalty, "deviation_average": average_penalty, "tasks": [len(tasks)], "process_name": process_name}
 
+def get_memory_allocation_average_over_tasks(tasks):
+    count_allocation = 0
+    count_absolute_requested = 0
+    count_absolute_used = 0
+    allocation_sum = 0
+    absoulte_requested_sum = 0
+    absolute_used_sum = 0
+    for task in tasks:
+        if task['memory_allocation']:
+            count_allocation = count_allocation + 1
+            allocation_sum = allocation_sum + task['memory_allocation']
+        if task['memory']:
+            count_absolute_requested = count_absolute_requested + 1
+            absoulte_requested_sum = absoulte_requested_sum + task['memory']
+        if task['rss']:
+            count_absolute_used = count_absolute_used + 1
+            absolute_used_sum = absolute_used_sum + task['rss']
+    
+    return {
+        'allocation_average': 0 if count_allocation == 0 else allocation_sum / count_allocation,
+        'requested_average': 0 if count_absolute_requested == 0 else absoulte_requested_sum / count_absolute_requested,
+        'used_average': 0 if count_absolute_used == 0 else absolute_used_sum / count_absolute_used
+    }
+
+
+def get_cpu_allocation_average_over_tasks(tasks):
+    count_allocation = 0
+    count_absolute_requested = 0
+    count_absolute_used = 0
+    allocation_sum = 0
+    absoulte_requested_sum = 0
+    absolute_used_sum = 0
+    for task in tasks:
+        if task['cpu_allocation']:
+            count_allocation = count_allocation + 1
+            allocation_sum = allocation_sum + task['cpu_allocation']
+        if task['cpus']:
+            count_absolute_requested = count_absolute_requested + 1
+            absoulte_requested_sum = absoulte_requested_sum + task['cpus']
+        if task['cpu_percentage'] and task['cpu_percentage']:
+            count_absolute_used = count_absolute_used + 1
+            absolute_used_sum = absolute_used_sum + task['cpu_percentage'] / 100
+    
+    return {
+        'allocation_average': 0 if count_allocation == 0 else allocation_sum / count_allocation,
+        'requested_average': 0 if count_absolute_requested == 0 else absoulte_requested_sum / count_absolute_requested,
+        'used_average': 0 if count_absolute_used == 0 else absolute_used_sum / count_absolute_used
+    }
+
+
+    """
+    {'task_id': 23, 'process': 'wDereplication:wDereplicateFile:_wDereplicate:_wSansDereplication:pGetSansClusterRepresentatives', 'run_name': 'small_ramanujan', 'cpus': 1, 'tag': None, 'memory': 1073741824, 'duration': 894, 'vmem': 16838656, 'realtime': 353, 'cpu_percentage': 776.1, 'rss': 11718656, 'cpu_allo
+    cation': 776.1, 'raw_cpu_penalty': 6.761, 'memory_allocation': 1.0913848876953125, 'raw_memory_penalty': 0.9890861511230469, 'weighted_cpu_score': 0.2392193165162385, 'weighted_memory_score': 0.4618496431719877, 'pure_score': 0.7010689596882262, 'weight_cpu': 0.5, 'weight_memory': 0.5}
+    """
 
 def get_per_process_memory_allocation_results(process_name, tasks):
     memory_penalties = [task['raw_memory_penalty'] for task in tasks]
@@ -418,54 +489,51 @@ def tags_from_string(str: string):
             pairs.append({'_': pair[0].strip()})
     return pairs
 
-def get_process_invalidities(details_for_run, comparison_values):
-    """
-    needs thresholds!
-    """
-    for x in details_for_run:
-        task_details = details_for_run[x]
-        task_details["problems"] = []
-        if "cpus" in task_details and "cpu_allocation" in task_details:
-            cpus_needed_float = task_details["cpu_percentage"] / 100
-            full_cpus_needed = math.ceil(cpus_needed_float)
-            global interval_valid_cpu_allocation_percentage
-            lower_limit_cpu, upper_limit_cpu = interval_valid_cpu_allocation_percentage
-
-            if task_details["cpu_allocation"] > upper_limit_cpu: 
-                if cpus_needed_float - full_cpus_needed > 0.2: # replace with other threshold value
-                    full_cpus_needed = full_cpus_needed + 1
-                if task_details["cpus"] < comparison_values["max_cpu"]: # 
-                    if full_cpus_needed > comparison_values["max_cpu"]:
-                       
-                        task_details["problems"].append({"cpu": "more", "restriction": None, "solution": {"cpus": full_cpus_needed}, "severity": get_cpu_severity(task_details)})
-                        
-                    else:
-                        task_details["problems"].append({"cpu": "more", "restriction": "max_reached", "solution": {"needed": full_cpus_needed, "available": comparison_values["max_cpu"]}, "severity": get_cpu_severity(task_details)})
-            elif task_details["cpu_allocation"] < lower_limit_cpu:
-                
-                if task_details["cpus"] > 1: 
-                    if full_cpus_needed == task_details["cpus"]:
-                        full_cpus_needed = full_cpus_needed - 1
-                    task_details["problems"].append({"cpu": "less", "restriction": None, "solution": {"cpus": full_cpus_needed}, "severity": get_cpu_severity(task_details)})
+def get_process_invalidities(tasks, max_cpu_requested, max_memory, max_memory_requested):
+    problems = []
+    if len(tasks) == 0:
+        return problems
+    memory_allocation_results = get_per_process_memory_allocation_results('', tasks)
+    cpu_allocation_results = get_per_process_cpu_allocation_results('', tasks)
+    memory_allocation_average = get_memory_allocation_average_over_tasks(tasks)
+    cpu_allocation_average = get_cpu_allocation_average_over_tasks(tasks)
+    
+    if cpu_allocation_results['deviation_average'] > 0.25:
+        cpu_needed_float = cpu_allocation_average['used_average']
+        cpu_requested_average = cpu_allocation_average['requested_average']
+        if cpu_needed_float < cpu_requested_average:
+            if cpu_needed_float < 1:
+                problems.append({"cpu": "less", "requested": cpu_requested_average, "restriction": "min_reached", "solution": {"process": "split"}})
+            else:
+                problems.append({"cpu": "less", "requested": cpu_requested_average, "restriction": None, "solution": {"cpus": cpu_needed_float}})
+        else:
+            if cpu_needed_float < max_cpu_requested:
+                problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": None, "solution": {"cpus": cpu_needed_float}})
+            else:
+                if max_cpu == 0:
+                    problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": "max_reached_unsure", "solution": {"needed": cpu_needed_float, "available": max_cpu_requested}})
                 else:
-                    task_details["problems"].append({"cpu": "less", "restriction": "min_reached", "solution": {"process": "split"}, "severity": get_cpu_severity(task_details)})
+                    problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": "max_reached", "solution": {"needed": cpu_needed_float, "available": max_cpu_requested}})
+    if memory_allocation_results['deviation_average'] > 0.25:
+        memory_needed_average = memory_allocation_average['used_average']
+        memory_requested_average = memory_allocation_average['requested_average']
+        if memory_needed_average < memory_requested_average:
+            problems.append({"ram": "less", "requested": memory_requested_average, "restriction": None, "solution": {"ram": memory_needed_average}})
+        else:
+            if memory_needed_average > max_memory:
+                if max_memory == 0:
+                    problems.append({"ram": "more", "requested": memory_requested_average, "restriction": "max_reached_unsure", "solution": {"ram": memory_needed_average , "available": max_memory }})
+                else:
+                    problems.append({"ram": "more", "requested": memory_requested_average, "restriction": "max_reached", "solution": {"ram": memory_needed_average, "available": max_memory }})
+            else:
+                problems.append({"ram": "more", "requested": memory_requested_average, "restriction": None, "solution": {"ram": memory_needed_average, "available": max_memory }})
 
-        if "ram_allocation" in task_details and "memory" in task_details and "rss" in task_details:
-            mem_alloc_percentage = task_details["ram_allocation"]
-            used_physical = task_details["rss"]
-            global interval_valid_ram_allocation
-            lower_limit_ram, upper_limit_ram = interval_valid_ram_allocation
-            if mem_alloc_percentage < lower_limit_ram:
-                task_details["problems"].append({"ram": "less", "restriction": None, "solution": {"ram": transfer_ram_limit(used_physical)}, "severity": get_memory_severity(task_details)})
-            elif mem_alloc_percentage > upper_limit_ram:
-                restriction = None
-                if used_physical > comparison_values["max_ram"]:
-                    restriction = "max_reached"
-                task_details["problems"].append({"ram": "more", "restriction": restriction, "solution": {"ram": transfer_ram_limit(used_physical, True), "available": comparison_values["max_ram"] }, "severity": get_memory_severity(task_details)})
-            
-          
-    return details_for_run
+    return problems
 
+
+"""
+Not used at the moment
+"""
 def transfer_ram_limit(ram_in_bytes, up=False):
     gib_value_float = ram_in_bytes / (math.pow(1024,3))
     gib_value_full_lower = math.floor(gib_value_float)
@@ -486,56 +554,7 @@ def get_minutes(milliseconds):
 
 def get_gibs(bytes):
     return bytes / 1073741824
-
-"""
- not used at the moment
-"""
-def OLD_get_process_invalidities(process: models.RunTrace, duration_mapping):
-    invalidities_list = []
-    to_return = False
-    ram_valid, problems = check_valid_ram_interval(process)
-    if not ram_valid:
-        invalidities_list.append(problems)
-        to_return = True
-
-    cpu_valid, problems = check_valid_cpu_interval(process)
-    if not cpu_valid:
-        invalidities_list.append(problems)
-        to_return = True
     
-    duration_values_without_process = [dur_obj["duration"] for dur_obj in duration_mapping if dur_obj["process"] != process.process and dur_obj["duration"]]
-    duration_values_without_this_explicit_task = [dur_obj["duration"] for dur_obj in duration_mapping if dur_obj["process"] != process.process and dur_obj["task_id"] != process.task_id and dur_obj["duration"]]
-    duration_values_within_process = [dur_obj["duration"] for dur_obj in duration_mapping if dur_obj["process"] == process.process and dur_obj["task_id"] != process.task_id and dur_obj["duration"]]
-    
-    if process.duration:
-        if process.duration > duration_to_consider_averages_threshold:
-            len_duration_wo_p = len(duration_values_without_process)
-            if len_duration_wo_p > 0:
-                average_without_process = sum(duration_values_within_process) / len_duration_wo_p
-                if average_without_process > threshold_duration_relation:
-                    invalidities_list.append({"duration_ratio_compared_to_other_processes": average_without_process})
-                    to_return = True
-
-            len_duration_wo_et = len(duration_values_without_this_explicit_task)
-            if len_duration_wo_et > 0:
-                average_without_task = sum(duration_values_without_this_explicit_task) / len_duration_wo_et 
-                if average_without_task > threshold_duration_relation:
-                    invalidities_list.append({"duration_ratio_compared_to_all": average_without_task})
-                    to_return = True
-
-            len_duration_within = len(duration_values_within_process)
-            if len_duration_within:
-                average_within = sum(duration_values_within_process) / len_duration_within
-                if average_within > threshold_duration_relation:
-                    invalidities_list.append({"duration_ratio_compared_to_same": average_within})
-                    to_return = True
-        if process.time:
-            duration_ratio = process.duration / process.time
-            if duration_ratio > duration_requested_relation_threshold:
-                invalidities_list.append({"duration_ratio_to_requested", duration_ratio})
-                to_return = True
-    return (not to_return, invalidities_list)
-
     
 def check_valid_ram_interval(process: models.RunTrace):
     if process.memory is not None and process.rss is not None:
@@ -549,6 +568,9 @@ def check_valid_cpu_interval(process: models.RunTrace):
             allocation = process.cpu_percentage / process.cpus
             return interval_valid_cpu_allocation_percentage[0] <= allocation <= interval_valid_cpu_allocation_percentage[1], {"cpu_allocation": allocation}
     return True, None
+"""
+end of not used at the moment
+"""
 
 def group_by_run_name(result_by_task):
     run_name_dictionary = {}
