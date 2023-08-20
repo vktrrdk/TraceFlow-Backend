@@ -105,11 +105,11 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             task_with_score = calculate_normalized_score_for_run(task, CPU_WEIGHT, RAM_WEIGHT, min_cpu_alloc, max_cpu_alloc, min_ram_alloc, max_ram_alloc)
             normalized_task_information_per_run[run_name].append(task_with_score)
         
-        process_scores_per_run[run_name] = {}
+        process_scores_per_run[run_name] = []
         distinct_process_names = list(set([task['process'] for task in normalized_task_information_per_run[run_name]]))
         for process in distinct_process_names:
             tasks_by_process = [task for task in normalized_task_information_per_run[run_name] if task['process'] == process]
-            process_scores_per_run[run_name][process] = calculate_weighted_scores(tasks_by_process)
+            process_scores_per_run[run_name].append({"process": process, 'score': calculate_weighted_scores(tasks_by_process)})
         
         full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
 
