@@ -129,7 +129,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
 
 def get_per_process_worst_rss_ratios(process_name, tasks):
     ratios = [1 if task['vmem'] == 0 else task['rss'] / task['vmem'] for task in tasks if task['rss'] and task['vmem']]
-    ratio_sum = sum[ratios]
+    ratio_sum = sum(ratios)
     ratio_average = 1
     if len(ratios) > 0:
         ratio_average = ratio_sum / len(ratios)
@@ -154,6 +154,24 @@ def get_per_process_memory_allocation_results(process_name, tasks):
 
     return {"deviation_sum": sum_penalty, "deviation_average": average_penalty, "tasks": [len(tasks)], "process_name": process_name}
 
+def get_process_relation_data(tasks):
+
+    cpu_allocation_values = [task['cpu_allocation'] for task in tasks if task['cpu_allocation'] and task['cpus'] and task['memory_allocation'] and task['memory']]
+    memory_allocation_values = [task['memory_allocation'] for task in tasks if task['cpu_allocation'] and task['cpus'] and task['memory_allocation'] and task['memory']]
+
+    rel_data = {}
+    if len(cpu_allocation_values) > 0:
+        rel_data["xMin"] = min(cpu_allocation_values)
+        rel_data["x"] = sum(cpu_allocation_values) / len(cpu_allocation_values)
+        rel_data["xMax"] = max(cpu_allocation_values)
+    
+    if len(memory_allocation_values) > 0:
+        rel_data["yMin"] = min(memory_allocation_values)
+        rel_data["y"] = sum(memory_allocation_values) / len(memory_allocation_values)
+        rel_data["yMax"] = max(memory_allocation_values)
+    
+    return rel_data
+
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
     result_scores = calculate_scores(db, grouped_processes, threshold_numbers)
@@ -163,47 +181,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     tag_process_mapping = []
     tag_analysis = []
     
-    """
-    for elem in threshold_numbers.items():
-        match elem[0]:
-            case "interval_valid_ram_relation":
-                global interval_valid_ram_relation
-                interval_valid_ram_relation = elem[1]
-            case "interval_valid_cpu_allocation_percentage":
-                global interval_valid_cpu_allocation_percentage
-                interval_valid_cpu_allocation_percentage = elem[1]
-            case "threshold_duration_relation":
-                global threshold_duration_relation
-                threshold_duration_relation = elem[1]
-            case "duration_to_consider_threshold":
-                global duration_to_consider_averages_threshold
-                duration_to_consider_averages_threshold = elem[1]
-            case "duration_requested_relation_relation_threshold":
-                global duration_requested_relation_threshold
-                duration_requested_relation_threshold = elem[1]
-            case "tag_duration_ratio_threshold":
-                global tag_duration_ratio_threshold
-                tag_duration_ratio_threshold = elem[1]
-            case "tag_duration_full_threshold":
-                global tag_duration_ratio_full_threshold
-                tag_duration_ratio_full_threshold = elem[1]
-            case "tag_cpu_allocation_ratio_threshold":
-                global tag_cpu_allocation_ratio_threshold
-                tag_cpu_allocation_ratio_threshold = elem[1]
-            case "tag_cpu_percentage_ratio_threshold":
-                global tag_cpu_percentage_ratio_threshold
-                tag_cpu_percentage_ratio_threshold = elem[1]
-            case "tag_memory_rss_average_ratio_threshold":
-                global tag_memory_rss_average_ratio_threshold
-                tag_memory_rss_average_ratio_threshold = elem[1]
-            case "top_percent_ratio":
-                global top_percent_ratio
-                top_percent_ratio = elem[1]
-            case "limit_processes_per_domain_by_number":
-                global limit_processes_per_domain_by_number
-                limit_processes_per_domain_by_number = elem[1]
-    
-    """
+
     # duration
     
     per_run_bad_duration_tasks = {}  # bad durations per task
@@ -251,6 +229,11 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         per_process_cpu_allocation = []
         per_process_memory_allocation = []
         per_process_rss_ratio = []
+
+        # ratio plot
+        ram_cpu_relation_labels = distinct_process_names
+        ram_cpu_relation_data = []
+
         for process_name in distinct_process_names:
             by_process_tasks = [task for task in run_task_information if task['process'] == process_name]
             per_process_realtime_list = [task['realtime'] for task in by_process_tasks if task['realtime'] is not None]
@@ -268,6 +251,19 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             memory_physical_ratio_results = get_per_process_worst_rss_ratios(process_name, by_process_tasks)
             per_process_rss_ratio.append(memory_physical_ratio_results)
 
+            process_relation_data = get_process_relation_data(by_process_tasks)
+            ram_cpu_relation_data.append(process_relation_data)
+
+            final_error_bar_data = {
+                "data": ram_cpu_relation_data,
+                "label": "CPU - RAM ratio"
+            }
+
+            per_run_cpu_ram_ratio_data[run_name] = {
+                "data": final_error_bar_data,
+                "labels": ram_cpu_relation_labels,
+            }
+
     
         per_run_bad_duration_processes_sums[run_name] = sorted(per_process_duration_sum, key=lambda process: process.get('sum'), reverse=True)[:return_number_processes]
        
@@ -282,40 +278,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         per_run_process_memory_allocation_deviation_averages[run_name] = sorted(per_process_memory_allocation, key=lambda process: process.get('deviation_average'), reverse=True)[:return_number_processes]
         per_run_worst_rss_vmem_ratio_processes[run_name] = sorted(per_process_rss_ratio, key=lambda process: process.get('ratio_average'))[:return_number_processes]
 
-        """
+        
 
-        ram_cpu_relation_labels = []
-        ram_cpu_relation_data = []
-
-        for item in process_mapping_allocation:
-            if len(process_mapping_allocation[item]) > 0:
-                if item in process_mapping_memory_allocation and len(process_mapping_memory_allocation[item]) > 0:
-                    
-                    x_vals = process_mapping_allocation[item]
-                    y_vals = process_mapping_memory_allocation[item]
-                    rel_data = {
-                        "xMin": min(x_vals),
-                        "x": sum(x_vals) / len(x_vals),
-                        "xMax": max(x_vals),
-                        "yMin": min(y_vals),
-                        "y": sum(y_vals) / len(y_vals),
-                        "yMax": max(y_vals),
-                        "id": item,
-                    }
-                    
-                    ram_cpu_relation_labels.append(item)
-                    ram_cpu_relation_data.append(rel_data)
-
-        final_error_bar_data = {
-            "data": ram_cpu_relation_data,
-            "label": "CPU - RAM ratio",
-        }
-
-        per_run_cpu_ram_ratio_data[key] = {
-            "labels": ram_cpu_relation_labels,
-            "data": final_error_bar_data
-        }
-        """
 
 
 
@@ -325,27 +289,22 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
     
         
-    analysis["process_wise"] = group_runwise(process_analysis)
-    analysis["tag_wise"] = group_runwise(tag_analysis)
-    
-        
-    analysis["bad_duration"] = per_run_bad_duration
-    analysis["least_cpu"] = per_run_process_least_cpu_allocation
-    analysis["most_cpu"] = per_run_process_most_cpu_allocation
-    analysis["cpu_average"] = per_run_process_cpu_average
-    analysis["cpu_allocation_average"] = per_run_process_cpu_allocation_average
-    analysis["duration_sum"] = per_run_process_duration_sum
-    analysis["worst_duration_sum"]=  sort_values_per_run(per_run_process_duration_sum, 'duration', reverse=True)
-    analysis["duration_average"] = per_run_process_duration_average
-    analysis["worst_duration_average"] = sort_values_per_run(per_run_process_duration_average, 'duration', reverse=True)
-    analysis["memory_allocation"] = per_run_process_memory_allocation_average
-    analysis["least_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average, 'memory_allocation')
-    analysis["most_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average , 'memory_allocation', reverse=True)
-    analysis["memory_relation_average"] = per_run_process_memory_relation_average
-    analysis["worst_memory_relation_average"] = sort_values_per_run(per_run_process_memory_relation_average, 'memory_relation')
-    
-    analysis["cpu_ram_relation_data"] = per_run_cpu_ram_ratio_data
     analysis["workflow_scores"] = result_scores
+    
+    analysis["bad_duration_tasks"] = per_run_bad_duration_tasks
+    analysis["bad_duration_processes_sum"] = per_run_bad_duration_processes_sums
+    analysis["bad_duration_processes_average"] = per_run_bad_duration_processes_average
+
+    analysis["cpu_allocation_deviation_sum"] = per_run_process_cpu_allocation_deviation_sums
+    analysis["cpu_allocation_deviation_average"] = per_run_process_cpu_allocation_deviation_averages
+    analysis["bad_cpu_allocation_tasks"] = per_run_task_worst_cpu_allocation
+
+    analysis["memory_allocation_deviation_sum"] = per_run_process_memory_allocation_deviation_sums
+    analysis["memory_allocation_deviation_average"] = per_run_process_memory_allocation_deviation_averages
+    analysis["bad_memory_allocation_tasks"] = per_run_task_worst_memory_allocation
+
+    analysis["bad_memory_ratio"] = per_run_worst_rss_vmem_ratio_processes
+    analysis["cpu_ram_relation_data"] = per_run_cpu_ram_ratio_data
 
 
     return analysis
