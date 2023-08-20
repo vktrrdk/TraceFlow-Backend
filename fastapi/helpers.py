@@ -27,7 +27,7 @@ limit_processes_per_domain_by_number = 10  # if 10% s more than this number, lim
 
 def get_relevant_information_per_task(task):
     task_dict = task.__dict__
-    relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'realtime', 'cpu_percentage', 'rss']
+    relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'vmem', 'realtime', 'cpu_percentage', 'rss']
     task_to_return = {rel_key: task_dict[rel_key] for rel_key in relevant_keys}
     return task_to_return
 
@@ -78,7 +78,6 @@ def calculate_weighted_scores(tasks):
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
     # check if we can propagate the weight numbers!
     # TODO: CHECK ALL CALCULATIONS AND ADJUST FURTHER PARTS
-    
     RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
     process_scores_per_run = {}
     full_score_per_run = {}
@@ -111,112 +110,49 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             process_scores_per_run[run_name][process] = calculate_weighted_scores(tasks_by_process)
         
         full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
-        print(process_scores_per_run)
-        print(full_score_per_run)
+
+    return {"task_information": normalized_task_information_per_run, "process_scores": process_scores_per_run, "full_scores": full_score_per_run}
 
 
-    
-        """
-            if task.cpus and task.cpus > 0 and task.cpu_percentage:
-                
-                cpu_alloc_score = (task.cpu_percentage / task.cpus)
-                plain_values[run_name][tid]["cpu_allocation"] = cpu_alloc_score
-                plain_values[run_name][tid]["cpus"] = task.cpus
-                plain_values[run_name][tid]["cpu_percentage"] = task.cpu_percentage
+"""
+{'task_id': 9, 'process': 'wDereplication:wDereplicateFile:_wDereplicate:pDumpLogs', 'run_name': 'small_ramanujan', 'cpus': 1,
+ 'tag': 'ID: test3_bin.1, Output: test3_bin.1, LogLevel: 0', 'memory': None, 'duration': 125, 'vmem': 0,
+ 'realtime': 6, 'cpu_percentage': 161.5, 'rss': 0, 'cpu_allocation': 161.5, 'raw_cpu_penalty': 0.615, 'memory_allocation': 0,
+ 'raw_memory_penalty': 1, 'weighted_cpu_score': 0.47627863920388797, 'weighted_memory_score': 0.4614286816323382, 
+ 'pure_score': 0.9377073208362261, 'weight_cpu': 0.5, 'weight_memory': 0.5},
+ {'task_id': 21, 'process': 'wDereplication:wDereplicateFile:_wDereplicate:_wSansDereplication:pSANS', 'run_name': 'small_ramanujan', 
+ 'cpus': 7, 'tag': 'Cluster 1', 'memory': 15032385536, 'duration': 1600, 'vmem': 18821120, 
+ 'realtime': 1030, 'cpu_percentage': 83.6, 'rss': 3305472, 'cpu_allocation': 11.942857142857141, 'raw_cpu_penalty': 0.8805714285714286, 
+ 'memory_allocation': 0.021989004952566966, 'raw_memory_penalty': 0.9997801099504743, 'weighted_cpu_score': 0.46603519908310465,
+ 'weighted_memory_score': 0.46143716308144433, 'pure_score': 0.927472362164549, 'weight_cpu': 0.5, 'weight_memory': 0.5}
+"""
 
-                cpu_alloc_score = cpu_alloc_score / 100
-                cpu_alloc_score = abs(1 - cpu_alloc_score)
-                cpu_allocation_scores[tid] = {"process": proc_name, "value": cpu_alloc_score}
-                cpus_requested[tid] = {"process": proc_name, "value": task.cpus}
-                all_cpu_alloc_values.append(cpu_alloc_score)
-        
-            if task.memory and task.memory > 0 and task.rss:
-                if task.memory_percentage:
-                    factor = task.memory_percentage / 100
-                    available_mem = task.rss / factor
-                    plain_values[run_name][tid]["available_ram"] = math.ceil(available_mem)
+def get_per_process_worst_rss_ratios(process_name, tasks):
+    ratios = [1 if task['vmem'] == 0 else task['rss'] / task['vmem'] for task in tasks if task['rss'] and task['vmem']]
+    ratio_sum = sum[ratios]
+    ratio_average = 1
+    if len(ratios) > 0:
+        ratio_average = ratio_sum / len(ratios)
+    return {"ratio_average": ratio_average, "tasks": len(tasks), "process_name": process_name}
 
-                ram_alloc_score = task.rss / task.memory # no division with 100, as ratio is already [0, 1]
+def get_per_process_cpu_allocation_results(process_name, tasks):
+    cpu_penalties = [task['raw_cpu_penalty'] for task in tasks]
+    sum_penalty = sum(cpu_penalties)
+    average_penalty = 0
+    if len(cpu_penalties) > 0:
+        average_penalty = sum_penalty / len(cpu_penalties)
 
-                plain_values[run_name][tid]["ram_allocation"] = ram_alloc_score * 100
-                plain_values[run_name][tid]["memory"] = task.memory
-                plain_values[run_name][tid]["rss"] = task.rss
-
-                ram_alloc_score = abs(1 - ram_alloc_score)
-                ram_allocation_scores[tid] = {"process": proc_name, "value": ram_alloc_score}
-                memory_requested[tid] = {"process": proc_name, "value": task.memory}
-                all_memory_alloc_values.append(ram_alloc_score)
-            if task.realtime and task.realtime > 0:
-                duration[tid] = {"process": proc_name, "value": task.realtime}
-            
-        
-        plain_values[run_name]
-
-        if len(all_cpu_alloc_values) > 0: 
-            min_cpu_alloc, max_cpu_alloc = 0, max([5, max(all_cpu_alloc_values)]) 
-            if max_cpu_alloc == 0:
-                max_cpu_alloc = sys.float_info.epsilon
-
-            for task_id in cpu_allocation_scores:
-                t_val_cpu = cpu_allocation_scores[task_id]["value"]
-                cpu_allocation_scores[task_id]["value"] = (t_val_cpu - min_cpu_alloc) / (max_cpu_alloc - min_cpu_alloc)
-        
-        # TODO adjust the normalization
-
-        if len(all_memory_alloc_values) > 0: 
-            min_mem_alloc, max_mem_alloc = 0, max([5, max(all_memory_alloc_values)])
-            if max_mem_alloc == 0:
-                max_mem_alloc = sys.float_info.epsilon
-            for task_id in ram_allocation_scores:
-                t_val_mem = ram_allocation_scores[task_id]["value"]
-                ram_allocation_scores[task_id]["value"] = (t_val_mem - min_mem_alloc) / (max_mem_alloc - min_mem_alloc)
-
-        cpu_key_list, ram_key_list = list(cpu_allocation_scores.keys()), list(ram_allocation_scores.keys())
-        scoreable_task_ids = [key for key in cpu_key_list if key in ram_key_list]
-        for task_id in scoreable_task_ids:
-            weighted_cpu_score = CPU_WEIGHT * (1 - cpu_allocation_scores[task_id]["value"])
-            weighted_ram_score = RAM_WEIGHT * (1 - ram_allocation_scores[task_id]["value"])
-            task_scores[task_id] = weighted_cpu_score + weighted_ram_score
-        weighted_scoreable_key_list = [key for key in scoreable_task_ids if key in duration]
-        scores_for_run[run_name]["task_scores"] = task_scores
-        weighted_process_scores = {}
-        for task_id in weighted_scoreable_key_list:
-            process_name = duration[task_id]["process"]
-            if process_name not in weighted_process_scores:
-                weighted_process_scores[process_name] = []
-            cpu_score = 1 - cpu_allocation_scores[task_id]["value"]
-            ram_score = 1 - ram_allocation_scores[task_id]["value"]
-            cpu_requ_value = cpus_requested[task_id]["value"]
-            mem_requ_value = memory_requested[task_id]["value"]
-            dur_value = duration[task_id]["value"]
-            value_numerator = (cpu_score * cpu_requ_value + ram_score * mem_requ_value) * dur_value
-            value_denominator = (cpu_requ_value + mem_requ_value) * dur_value
-            weighted_process_scores[process_name].append({"numerator": value_numerator, "denominator": value_denominator})
-        
-        per_process_scores = {}
-        
-        for process in weighted_process_scores:
-            numerator_sum = sum(calculated['numerator'] for calculated in weighted_process_scores[process])
-            denominator_sum = sum(calculated['denominator'] for calculated in weighted_process_scores[process])
-            result = numerator_sum / denominator_sum
-            per_process_scores[process] = result
-
-        scores_for_run[run_name]["process_scores"] = per_process_scores # check if this can be calculated differently
+    return {"deviation_sum": sum_penalty, "deviation_average": average_penalty, "tasks": [len(tasks)], "process_name": process_name}
 
 
-        if len(task_scores.values()) > 0:
-            full_workflow_score = sum(task_scores.values()) / len(task_scores.values())
-        else:
-            full_workflow_score = 0
-        scores_for_run[run_name]["full_run_score"] = full_workflow_score
+def get_per_process_memory_allocation_results(process_name, tasks):
+    memory_penalties = [task['raw_memory_penalty'] for task in tasks]
+    sum_penalty = sum(memory_penalties)
+    average_penalty = 0
+    if len(memory_penalties) > 0:
+        average_penalty = sum_penalty / len(memory_penalties)
 
-
-        # TODO: describe these values with equations in the thesis
-
-                            scores_for_run["detail"] = plain_values
-                return scores_for_run
-        """
-
+    return {"deviation_sum": sum_penalty, "deviation_average": average_penalty, "tasks": [len(tasks)], "process_name": process_name}
 
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
@@ -227,6 +163,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     tag_process_mapping = []
     tag_analysis = []
     
+    """
     for elem in threshold_numbers.items():
         match elem[0]:
             case "interval_valid_ram_relation":
@@ -266,181 +203,93 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
                 global limit_processes_per_domain_by_number
                 limit_processes_per_domain_by_number = elem[1]
     
+    """
+    # duration
+    
+    per_run_bad_duration_tasks = {}  # bad durations per task
+
+    per_run_bad_duration_processes_sums = {} # bad duration summarized over all tasks of a process
+    per_run_bad_duration_processes_average = {} # bad duration averaged over all tasks of a process
+
+    # allocations
+
+    per_run_process_cpu_allocation_deviation_sums = {} # bad cpu allocations by process summarized
+    per_run_task_worst_cpu_allocation = {}
+    per_run_process_cpu_allocation_deviation_averages = {} # bad cpu allocations by process averaged
+
+    per_run_process_memory_allocation_deviation_sums = {} # bad memory allocation by process summarized
+    per_run_task_worst_memory_allocation = {}
+    per_run_process_memory_allocation_deviation_averages = {} # bad memory allocation by process averaged
+    
+    # ratio
+
+    per_run_cpu_ram_ratio_data = {} # for plot
+
+    per_run_worst_rss_vmem_ratio_processes = {} # worst ratio for rss/vmem
+   
+
+    for run_name in result_scores['task_information']:
+        run_task_information = result_scores['task_information'][run_name]
+        distinct_process_names = list(set([task['process'] for task in run_task_information]))
+        
+        return_number_tasks = min([5, len(run_task_information)]) # could be more dynamic
+        return_number_processes = min([5, len(distinct_process_names)]) # as well
+
+        # duration
+        duration_sorted_list_descending = sorted(run_task_information, key=lambda task: task.get('realtime', -1) or -1, reverse=True)
+        # cpu_alloc
+        cpu_alloc_sorted_list_descending = sorted(run_task_information, key=lambda task: task.get('raw_cpu_penalty', -1) or -1, reverse=True)
+        # memory_alloc
+        memory_alloc_sorted_list_descending = sorted(run_task_information, key=lambda task: task.get('raw_memory_penalty', -1) or -1, reverse=True)
+        
+        per_run_bad_duration_tasks[run_name] = duration_sorted_list_descending[:return_number_tasks]
+        per_run_task_worst_cpu_allocation[run_name] = cpu_alloc_sorted_list_descending[:return_number_tasks]
+        per_run_task_worst_memory_allocation[run_name] = memory_alloc_sorted_list_descending[:return_number_tasks]
+
+        per_process_duration_sum = []
+        per_process_duration_average = []
+        per_process_cpu_allocation = []
+        per_process_memory_allocation = []
+        per_process_rss_ratio = []
+        for process_name in distinct_process_names:
+            by_process_tasks = [task for task in run_task_information if task['process'] == process_name]
+            per_process_realtime_list = [task['realtime'] for task in by_process_tasks if task['realtime'] is not None]
+            per_process_duration_sum.append({"process": process_name, "sum": sum(per_process_realtime_list)})
+            if len(per_process_realtime_list) == 0:
+                per_process_duration_average.append({"process": process_name, "average": 0})
+            else: 
+                per_process_duration_average.append({"process": process_name, "average": sum(per_process_realtime_list) / len(per_process_realtime_list)})
+            
+            cpu_allocation_results = get_per_process_cpu_allocation_results(process_name, by_process_tasks)
+            per_process_cpu_allocation.append(cpu_allocation_results)
+            memory_allocation_results = get_per_process_memory_allocation_results(process_name, by_process_tasks)
+            per_process_memory_allocation.append(memory_allocation_results)
+
+            memory_physical_ratio_results = get_per_process_worst_rss_ratios(process_name, by_process_tasks)
+            per_process_rss_ratio.append(memory_physical_ratio_results)
 
     
-    per_run_bad_duration = {}  # bad durations by run
-    per_run_process_duration_sum = {}
-    per_run_process_duration_average = {}
-    per_run_process_cpu_average = {}
-    per_run_process_cpu_allocation_average = {}
-    per_run_process_least_cpu_allocation = {}
-    per_run_process_most_cpu_allocation = {}
-    per_run_process_memory_relation_average = {}
-    per_run_process_memory_allocation_average = {}
+        per_run_bad_duration_processes_sums[run_name] = sorted(per_process_duration_sum, key=lambda process: process.get('sum'), reverse=True)[:return_number_processes]
+       
+        per_run_bad_duration_processes_average[run_name] = sorted(per_process_duration_average, key=lambda process: process.get('average'), reverse=True)[:return_number_processes]
 
-    per_run_cpu_ram_ratio_data = {}
-
-    for key in grouped_processes:
-        max_cpu_requested_value = 0
-        max_memory_available = 0
-
-        process_mapping_cpu_raw = {}
-        process_mapping_allocation = {}
-        process_mapping_duration = {}
-        
-        process_mapping_memory_percentage = {} # memory_percentage
-        process_mapping_memory_allocation = {} # rss/mem
-        process_mapping_memory_relation = {} # rss/vmem
-
-
-        process_duration_sum = {}
-        process_duration_average = {}
-        process_memory_allocation_average = {}
-        process_memory_relation_average = {}
-        process_cpu_allocation_average = {}
-        process_cpu_raw_usage = {}
-        process_cpu_raw_average = {}
-
-
-        group = grouped_processes[key]
-        group_dicts = [vars(process) for process in group]
-        check_number = min([limit_processes_per_domain_by_number, len(group_dicts)])
-        number_of_elems_to_return = min([limit_processes_per_domain_by_number, int(len(group_dicts) * top_percent_ratio)])
-        number_of_elems_to_return = max([check_number, number_of_elems_to_return])
-
-        # sort by duration
-        mapping_keys = ["process", "task_id", "duration", "tag"]  # only retrieve these
-        duration_sorted_list = sorted(group_dicts, key=lambda proc: proc.get('duration', 0) or 0, reverse=True)
-        duration_list = [{key: process[key] for key in mapping_keys if key in process} for process in duration_sorted_list]
-        for task in duration_list:
-            task['tag'] = tags_from_string(task['tag'])
-        duration_sum = sum([process["duration"] for process in group_dicts if process["duration"] is not None])
-        average_duration = duration_sum / len(group_dicts)
-        
-        worst_duration_list = duration_list[:number_of_elems_to_return]
-        per_run_bad_duration[key] = worst_duration_list
-
-        cpu_percentage_sorted_allocation_list_least = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or sys.maxsize) / (proc.get('cpus') or 0.00000001)) # is there a better wy=
-        
-        cpu_allocated_least_list = [
-            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1), "tag": proc["tag"]} for proc in cpu_percentage_sorted_allocation_list_least
-            ][:number_of_elems_to_return]
-    
-        per_run_process_least_cpu_allocation[key] = cpu_allocated_least_list
-        
-        cpu_percentage_sorted_allocation_list_most = sorted(group_dicts, key=lambda proc: (proc.get('cpu_percentage') or 0.000001) / (proc.get('cpus') or sys.maxsize), reverse=True)
-        cpu_allocated_most_list = [
-            {"process": proc["process"], "task_id": proc["task_id"], "allocation": (proc['cpu_percentage'] or 0) / (proc['cpus'] or 1), "tag": proc["tag"]} for proc in cpu_percentage_sorted_allocation_list_most
-            ][:number_of_elems_to_return]
-
-        per_run_process_most_cpu_allocation[key] = cpu_allocated_most_list
-        
-        for process in group_dicts:
-            if process["cpus"] and process["cpus"] > 0:
-                if process["cpus"] > max_cpu_requested_value:
-                    max_cpu_requested_value = process["cpus"]
-            if process["process"] not in process_mapping_cpu_raw:
-                process_mapping_cpu_raw[process["process"]] = []
-            if process["cpu_percentage"]:
-                process_mapping_cpu_raw[process["process"]].append(process["cpu_percentage"])
-
-            if process["process"] not in process_mapping_allocation:
-                process_mapping_allocation[process["process"]] = []
-            if process["cpu_percentage"] and process["cpus"] > 0:
-                process_mapping_allocation[process["process"]].append(process["cpu_percentage"] / process["cpus"])
-
-            if process["duration"]:
-                if process["process"] not in process_mapping_duration:
-                    process_mapping_duration[process["process"]] = []
-                process_mapping_duration[process["process"]].append(process["duration"])
-            
-            
-            if process["process"] not in process_mapping_memory_percentage:
-                process_mapping_memory_percentage[process["process"]] = []
-            if process["memory_percentage"]:
-                process_mapping_memory_percentage[process["process"]].append(process["memory_percentage"])
-            
-
-
-            if process["rss"]:
-                if process["memory"] and process["memory"] > 0:
-                    if process["process"] not in process_mapping_memory_allocation:
-                        process_mapping_memory_allocation[process["process"]] = []
-                    process_mapping_memory_allocation[process["process"]].append((process["rss"] / process["memory"]) * 100)
-            
-                if process["vmem"] and process["vmem"] > 0:
-                    if process["process"] not in process_mapping_memory_relation:
-                        process_mapping_memory_relation[process["process"]] = []
-                    process_mapping_memory_relation[process["process"]].append((process["rss"] / process["vmem"]) * 100)
-            if process["memory_percentage"] and process["rss"]:
-                if max_memory_available == 0:
-                    max_memory_available = process["rss"] * (1 / (process["memory_percentage"] / 100))
-
-                
-
-        for process, raw_usages in process_mapping_cpu_raw.items():
-            process_sum = sum(raw_usages)
-            average = 0
-            if len(raw_usages) > 0:
-                average = process_sum / len(raw_usages)
-            process_cpu_raw_average[process] = average
-
-
-        per_run_process_cpu_average[key] = process_cpu_raw_average
-
-
-        for process, allocation_usages in process_mapping_allocation.items():
-            process_sum = sum(allocation_usages)
-            process_average = 0
-            if len(allocation_usages) > 0:
-                process_average = process_sum  / len (allocation_usages)
-            process_cpu_allocation_average[process] = process_average
-        
-        per_run_process_cpu_allocation_average[key] = process_cpu_allocation_average
-        
-
-        for process, duration_mapping in process_mapping_duration.items():
-            duration_sum = sum(duration_mapping)
-            process_average = 0
-            if len(duration_mapping) > 0:
-                process_average = duration_sum / len(duration_mapping)
-            process_duration_sum[process] = duration_sum
-            process_duration_average[process] = process_average
-
-        per_run_process_duration_sum[key] = process_duration_sum
-        per_run_process_duration_average[key] = process_duration_average
-
-        # check for process, percentage_mapping in process_mapping_memory_percentage
-
-        for process, mapping in process_mapping_memory_relation.items():
-            m_sum = sum(mapping)
-            average = 0
-            if len(mapping) > 0:
-                average = m_sum / len(mapping)
-            process_memory_allocation_average[process] = average
-
-        per_run_process_memory_relation_average[key] = process_memory_relation_average
     
         
-        for process, mapping in process_mapping_memory_allocation.items():
-            relation_sum = sum(mapping)
-            average = 0
-            if len(mapping) > 0:
-                average = relation_sum / len(mapping)
-    
-            process_memory_relation_average[process] = average
+        per_run_process_cpu_allocation_deviation_sums[run_name] = sorted(per_process_cpu_allocation, key=lambda process: process.get('deviation_sum'), reverse=True)[:return_number_processes]
+        per_run_process_cpu_allocation_deviation_averages[run_name] = sorted(per_process_cpu_allocation, key=lambda process: process.get('deviation_average'), reverse=True)[:return_number_processes]
 
-        per_run_process_memory_allocation_average[key] = process_memory_allocation_average
+        per_run_process_memory_allocation_deviation_sums[run_name] = sorted(per_process_memory_allocation, key=lambda process: process.get('deviation_sum'), reverse=True)[:return_number_processes]
+        per_run_process_memory_allocation_deviation_averages[run_name] = sorted(per_process_memory_allocation, key=lambda process: process.get('deviation_average'), reverse=True)[:return_number_processes]
+        per_run_worst_rss_vmem_ratio_processes[run_name] = sorted(per_process_rss_ratio, key=lambda process: process.get('ratio_average'))[:return_number_processes]
 
-        # set the data for the plot
+        """
 
-        
         ram_cpu_relation_labels = []
         ram_cpu_relation_data = []
 
         for item in process_mapping_allocation:
             if len(process_mapping_allocation[item]) > 0:
-                if item in process_mapping_memory_allocation and    len(process_mapping_memory_allocation[item]) > 0:
+                if item in process_mapping_memory_allocation and len(process_mapping_memory_allocation[item]) > 0:
                     
                     x_vals = process_mapping_allocation[item]
                     y_vals = process_mapping_memory_allocation[item]
@@ -466,16 +315,16 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
             "labels": ram_cpu_relation_labels,
             "data": final_error_bar_data
         }
+        """
 
-        result_scores['detail'][key] = get_process_invalidities(result_scores['detail'][key], {"max_cpu": max_cpu_requested_value, "max_ram": max_memory_available})
-        for tid, task_with_problems in result_scores['detail'][key].items():
-            if len(task_with_problems['problems']) > 0:
-                task_with_problems['problems'] = sorted(task_with_problems['problems'], key=lambda problem: problem["severity"], reverse=True)
-        result_scores['detail'][key] = [{"task_id": tid, "score": result_scores[key]['task_scores'][tid], **values} for tid, values in result_scores['detail'][key].items() if tid in result_scores[key]['task_scores']]
+
+
     
-    """
-    CONSIDER THIS: (sum_over_all_tasks ((w_1 * r_t_1 * a_t_1 * d) + (w_2 * r_t_2 * a_t_2 * d))) / (sum_over_all_tasks (w_1 * a_t_1 * d) + (w_2 * a_t_2 * d))
-    """           
+        
+       
+
+    
+        
     analysis["process_wise"] = group_runwise(process_analysis)
     analysis["tag_wise"] = group_runwise(tag_analysis)
     
@@ -494,7 +343,7 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
     analysis["most_memory_allocation_average"] = sort_values_per_run(per_run_process_memory_allocation_average , 'memory_allocation', reverse=True)
     analysis["memory_relation_average"] = per_run_process_memory_relation_average
     analysis["worst_memory_relation_average"] = sort_values_per_run(per_run_process_memory_relation_average, 'memory_relation')
-
+    
     analysis["cpu_ram_relation_data"] = per_run_cpu_ram_ratio_data
     analysis["workflow_scores"] = result_scores
 
