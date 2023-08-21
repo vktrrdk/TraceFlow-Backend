@@ -49,12 +49,10 @@ def calculate_raw_scores_per_task(reduced_task):
     return reduced_task
 
 def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min_ram, max_ram):
-    # normalized_penalty = (t_val_mem - min_mem_alloc) / (max_mem_alloc - min_mem_alloc)
-    # RAM_WEIGHT * (1 - ram_allocation_scores[task_id]["value"])
-    normalized_cpu_penalty = (task['raw_cpu_penalty'] - min_cpu) / (max_cpu - min_cpu)
+    normalized_cpu_penalty = min([1.0, (task['raw_cpu_penalty'] - min_cpu) / (max_cpu - min_cpu)])
     weighted_cpu_score = w_cpu * (1 - normalized_cpu_penalty)
     task['weighted_cpu_score'] = weighted_cpu_score
-    normalized_memory_penalty = (task['raw_memory_penalty'] - min_ram) / (max_ram - min_ram)
+    normalized_memory_penalty = min([1.0, (task['raw_memory_penalty'] - min_ram) / (max_ram - min_ram)])
     weighted_memory_score = w_ram * (1 - normalized_memory_penalty)
     task['weighted_memory_score'] = weighted_memory_score
     task['pure_score'] = weighted_cpu_score + weighted_memory_score
@@ -77,13 +75,27 @@ def calculate_weighted_scores(tasks, process_name=None, limits={}):
     if process_name:
         return {
             "process": process_name, "score": score, 
-            "problems": get_process_invalidities(tasks, limits["max_cpu_requested"], limits["max_memory"], limits["max_memory_requested"])
+            "problems": get_process_invalidities(tasks, limits["max_cpu_requested"], limits["max_memory"], limits["max_memory_requested"], limits['cpu_deviation'], limits['memory_deviation'])
         }
     else:
         return score
 
 def calculate_scores(db: Session, grouped_processes, threshold_numbers):
-    RAM_WEIGHT, CPU_WEIGHT = 0.5, 0.5
+    if threshold_numbers['valid_cpu_allocation_deviation']:
+        VALID_CPU_DEVIATION = float(threshold_numbers['valid_cpu_allocation_deviation'] / 100)
+    else: 
+        VALID_CPU_DEVIATION = 0.25
+    if threshold_numbers['valid_memory_allocation_deviation']:
+        VALID_MEMORY_DEVIATION = float(threshold_numbers['valid_memory_allocation_deviation'] / 100)
+    else:
+        VALID_MEMORY_DEVIATION = 0.25
+    if threshold_numbers['cpu_weight'] and threshold_numbers['ram_weight']:
+        RAM_WEIGHT = float(threshold_numbers['ram_weight'])
+        CPU_WEIGHT = float(threshold_numbers['cpu_weight'])
+    else:
+        RAM_WEIGHT = 0.5
+        CPU_WEIGHT = 0.5
+
     process_scores_per_run = {}
     full_score_per_run = {}
     raw_task_information_per_run = {}
@@ -111,11 +123,13 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
                 available_memory = (100 / task.memory_percentage) * task.rss
             available_memory = max([available_memory, available_rss])
 
-        limits = {"max_cpu_requested": max_cpu_requested, "max_memory_requested": max_memory_requested, "max_memory": available_memory}
-        cpu_alloc_values = [(task_information.get('cpu_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
-        min_cpu_alloc, max_cpu_alloc = 0, max([5, max(cpu_alloc_values)]) # max 10 times the cpus needed or more 
-        memory_alloc_values = [(task_information.get('memory_allocation', 0) / 100) for task_information in raw_task_information_per_run[run_name]]
-        min_ram_alloc, max_ram_alloc = 0, max([5, max(cpu_alloc_values)]) # max 5 times the ram requested or more
+        limits = {
+            "max_cpu_requested": max_cpu_requested, "max_memory_requested": max_memory_requested, "max_memory": available_memory,
+            "cpu_deviation": VALID_CPU_DEVIATION, "memory_deviation": VALID_MEMORY_DEVIATION,
+        
+        }
+        min_cpu_alloc, max_cpu_alloc = 0, 3 # max 3 times the cpus needed or more 
+        min_ram_alloc, max_ram_alloc = 0, 3 # max 3 times the ram requested or more
         
         normalized_task_information_per_run[run_name] = []
         for task in raw_task_information_per_run[run_name]:
@@ -235,11 +249,7 @@ def get_process_relation_data(tasks):
 def analyze(db: Session, grouped_processes, threshold_numbers):
     result_scores = calculate_scores(db, grouped_processes, threshold_numbers)
     analysis = {}
-    process_analysis = []
-    tags_presave = []
-    tag_process_mapping = []
-    tag_analysis = []
-    
+
 
     # duration
     
@@ -489,7 +499,8 @@ def tags_from_string(str: string):
             pairs.append({'_': pair[0].strip()})
     return pairs
 
-def get_process_invalidities(tasks, max_cpu_requested, max_memory, max_memory_requested):
+def get_process_invalidities(tasks, max_cpu_requested, max_memory, max_memory_requested, cpu_deviation, memory_deviation):
+
     problems = []
     if len(tasks) == 0:
         return problems
@@ -498,7 +509,7 @@ def get_process_invalidities(tasks, max_cpu_requested, max_memory, max_memory_re
     memory_allocation_average = get_memory_allocation_average_over_tasks(tasks)
     cpu_allocation_average = get_cpu_allocation_average_over_tasks(tasks)
     
-    if cpu_allocation_results['deviation_average'] > 0.25:
+    if cpu_allocation_results['deviation_average'] > cpu_deviation:
         cpu_needed_float = cpu_allocation_average['used_average']
         cpu_requested_average = cpu_allocation_average['requested_average']
         if cpu_needed_float < cpu_requested_average:
@@ -510,11 +521,11 @@ def get_process_invalidities(tasks, max_cpu_requested, max_memory, max_memory_re
             if cpu_needed_float < max_cpu_requested:
                 problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": None, "solution": {"cpus": cpu_needed_float}})
             else:
-                if max_cpu == 0:
+                if max_cpu_requested == 0:
                     problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": "max_reached_unsure", "solution": {"needed": cpu_needed_float, "available": max_cpu_requested}})
                 else:
                     problems.append({"cpu": "more", "requested": cpu_requested_average, "restriction": "max_reached", "solution": {"needed": cpu_needed_float, "available": max_cpu_requested}})
-    if memory_allocation_results['deviation_average'] > 0.25:
+    if memory_allocation_results['deviation_average'] > memory_deviation:
         memory_needed_average = memory_allocation_average['used_average']
         memory_requested_average = memory_allocation_average['requested_average']
         if memory_needed_average < memory_requested_average:
