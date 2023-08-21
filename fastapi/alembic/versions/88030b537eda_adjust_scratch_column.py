@@ -17,8 +17,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.alter_column('run_metric', 'scratch', type=sa.String(), nullable=True)
+    op.alter_column('run_metric', 'scratch', type_=sa.String(), nullable=True)
 
 
 def downgrade() -> None:
-    op.alter_column('run_metric', 'scratch', type=sa.Boolean(), nullable=True)
+    op.alter_column('run_metric', 'scratch', type_=sa.Boolean(), nullable=True)
