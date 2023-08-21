@@ -74,7 +74,7 @@ class RunTrace(Base):
     vol_ctxt = Column(BigInteger, nullable=True) # trace:vol_ctxt
     inv_ctxt = Column(BigInteger, nullable=True) # trace:inv_ctxt
     event = Column(String, nullable=True) # event
-    scratch = Column(Boolean, nullable=True) # scratch
+    scratch = Column(String, nullable=True) # scratch
 
 
 
