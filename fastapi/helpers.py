@@ -27,51 +27,75 @@ limit_processes_per_domain_by_number = 10  # if 10% s more than this number, lim
 
 def get_relevant_information_per_task(task):
     task_dict = task.__dict__
-    relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'vmem', 'realtime', 'cpu_percentage', 'rss']
+    relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'vmem', 'realtime', 'cpu_percentage', 'rss', 'status']
     task_to_return = {rel_key: task_dict[rel_key] for rel_key in relevant_keys}
     return task_to_return
 
-def calculate_raw_scores_per_task(reduced_task):
-    if reduced_task['cpus'] and reduced_task['cpus'] > 0 and reduced_task['cpu_percentage']:
-        cpu_alloc = reduced_task['cpu_percentage'] / reduced_task['cpus']
-        reduced_task['cpu_allocation'] = cpu_alloc
-        reduced_task['raw_cpu_penalty'] = abs(1 - (cpu_alloc / 100))
+def calculate_raw_scores_per_task(reduced_task, w_cpu, w_ram):
+    if reduced_task['status'] == "FAILED":
+        reduced_task['raw_cpu_penalty'] = None
+        reduced_task['raw_memory_penalty'] = None
+        reduced_task['memory_allocation'] = None
+        reduced_task['cpu_allocation'] = None
+        
     else:
-        reduced_task['cpu_allocation'] = 0
-        reduced_task['raw_cpu_penalty'] = 1
-    if reduced_task['memory'] and reduced_task['memory'] > 0 and reduced_task['rss']:
-        memory_alloc = reduced_task['rss'] / reduced_task['memory']
-        reduced_task['memory_allocation'] = memory_alloc * 100
-        reduced_task['raw_memory_penalty'] = abs(1 - memory_alloc)
-    else:
-        reduced_task['memory_allocation'] = 0
-        reduced_task['raw_memory_penalty'] = 1
+        reduced_task['weight_cpu'] = w_cpu
+        reduced_task['weight_memory'] = w_ram
+        if reduced_task['cpus'] and reduced_task['cpus'] > 0 and reduced_task['cpu_percentage']:
+            cpu_alloc = reduced_task['cpu_percentage'] / reduced_task['cpus']
+            reduced_task['cpu_allocation'] = cpu_alloc
+            reduced_task['raw_cpu_penalty'] = abs(1 - (cpu_alloc / 100))
+            if cpu_alloc > 100:
+                delta = reduced_task['raw_cpu_penalty']
+                reduced_task['raw_cpu_score'] = math.exp(-4 * delta)
+            else:
+                reduced_task['raw_cpu_score'] = cpu_alloc / 100
+            
+        else:
+            reduced_task['cpu_allocation'] = None
+            reduced_task['raw_cpu_penalty'] = None
+        if reduced_task['memory'] and reduced_task['memory'] > 0 and reduced_task['rss']:
+            memory_alloc = reduced_task['rss'] / reduced_task['memory']
+            reduced_task['memory_allocation'] = memory_alloc * 100
+            reduced_task['raw_memory_penalty'] = abs(1 - memory_alloc)
+            if memory_alloc > 1:
+                delta = reduced_task['raw_memory_penalty']
+                reduced_task['raw_memory_score'] = math.exp(-4 * delta)
+            else:
+                reduced_task['raw_memory_score'] = memory_alloc
+        else:
+            reduced_task['memory_allocation'] = None
+            reduced_task['raw_memory_penalty'] = None
+        
+            
     return reduced_task
 
-def calculate_normalized_score_for_run(task, w_cpu, w_ram, min_cpu, max_cpu, min_ram, max_ram):
-    normalized_cpu_penalty = min([1.0, (task['raw_cpu_penalty'] - min_cpu) / (max_cpu - min_cpu)])
-    weighted_cpu_score = w_cpu * (1 - normalized_cpu_penalty)
-    task['weighted_cpu_score'] = weighted_cpu_score
-    normalized_memory_penalty = min([1.0, (task['raw_memory_penalty'] - min_ram) / (max_ram - min_ram)])
-    weighted_memory_score = w_ram * (1 - normalized_memory_penalty)
-    task['weighted_memory_score'] = weighted_memory_score
-    task['pure_score'] = weighted_cpu_score + weighted_memory_score
-    task['weight_cpu'] = w_cpu
-    task['weight_memory'] = w_ram
+def calculate_weighted_metric_scores_for_run(task):
+    if task['status'] != "FAILED" and 'raw_cpu_score' in task and 'raw_memory_score' in task:
+        weighted_cpu_score = task['weight_cpu'] * task['raw_cpu_score'] #
+        task['weighted_cpu_score'] = weighted_cpu_score
+        weighted_memory_score = task['weight_memory'] * task['raw_memory_score']
+        task['weighted_memory_score'] = weighted_memory_score
+        task['pure_score'] = weighted_cpu_score + weighted_memory_score
+    else:
+        task['weighted_cpu_score'] = None
+        task['weighted_memory_score'] = None
+        task['pure_score'] = None
     return task
 
 def calculate_weighted_scores(tasks, process_name=None, limits={}):
     nominator_sum = 0
     denominator_sum = 0
     for task in tasks:
-        if task['weighted_cpu_score'] and task['cpus'] and task['weighted_memory_score'] and task['memory'] and task['realtime']:
-            nominator_sum = nominator_sum + (task['weighted_cpu_score'] * task['cpus'] + task['weighted_memory_score'] * task['memory'] ) * task['realtime']
-            denominator_sum = denominator_sum + (task['weight_cpu'] * task['cpus'] + task['weight_memory'] * task['memory']) * task['realtime']
+        if task['weighted_cpu_score'] and task['cpu_percentage'] and task['weighted_memory_score'] and task['rss'] and task['realtime']:
+            nominator_sum = nominator_sum + (task['weighted_cpu_score'] * (task['cpu_percentage'] / 100) + task['weighted_memory_score'] * ((task['rss'] / (math.pow(1024, 3))) / 8) ) * task['realtime']
+            denominator_sum = denominator_sum + (task['weight_cpu'] * (task['cpu_percentage'] / 100) + task['weight_memory'] * ((task['rss'] / (math.pow(1024, 3))) / 8)) * task['realtime']
     
     if denominator_sum == 0:
         score = 0
     else:
         score = nominator_sum / denominator_sum
+        print(score)
     if process_name:
         return {
             "process": process_name, "score": score, 
@@ -80,7 +104,7 @@ def calculate_weighted_scores(tasks, process_name=None, limits={}):
     else:
         return score
 
-def calculate_scores(db: Session, grouped_processes, threshold_numbers):
+def calculate_scores(grouped_processes, threshold_numbers):
     if threshold_numbers['valid_cpu_allocation_deviation']:
         VALID_CPU_DEVIATION = float(threshold_numbers['valid_cpu_allocation_deviation'] / 100)
     else: 
@@ -99,7 +123,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
     process_scores_per_run = {}
     full_score_per_run = {}
     raw_task_information_per_run = {}
-    normalized_task_information_per_run = {}
+    weighted_task_information_per_run = {}
 
     # threshold numbers to be used later on
     for run_name in grouped_processes:
@@ -111,7 +135,7 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
         raw_task_information_per_run[run_name] = []
         for task in run_tasks:
             reduced_task = get_relevant_information_per_task(task)
-            task_with_scores = calculate_raw_scores_per_task(reduced_task)
+            task_with_scores = calculate_raw_scores_per_task(reduced_task, CPU_WEIGHT, RAM_WEIGHT)
             raw_task_information_per_run[run_name].append(task_with_scores)
             if task.cpus and task.cpus > max_cpu_requested:
                 max_cpu_requested = task.cpus
@@ -128,23 +152,18 @@ def calculate_scores(db: Session, grouped_processes, threshold_numbers):
             "cpu_deviation": VALID_CPU_DEVIATION, "memory_deviation": VALID_MEMORY_DEVIATION,
         
         }
-        min_cpu_alloc, max_cpu_alloc = 0, 3 # max 3 times the cpus needed or more 
-        min_ram_alloc, max_ram_alloc = 0, 3 # max 3 times the ram requested or more
-        
-        normalized_task_information_per_run[run_name] = []
+        weighted_task_information_per_run[run_name] = []
         for task in raw_task_information_per_run[run_name]:
-            task_with_score = calculate_normalized_score_for_run(task, CPU_WEIGHT, RAM_WEIGHT, min_cpu_alloc, max_cpu_alloc, min_ram_alloc, max_ram_alloc)
-            normalized_task_information_per_run[run_name].append(task_with_score)
-        
+            weighted_task_information_per_run[run_name].append(calculate_weighted_metric_scores_for_run(task))
         process_scores_per_run[run_name] = []
-        distinct_process_names = list(set([task['process'] for task in normalized_task_information_per_run[run_name]]))
+        distinct_process_names = list(set([task['process'] for task in weighted_task_information_per_run[run_name]]))
         for process in distinct_process_names:
-            tasks_by_process = [task for task in normalized_task_information_per_run[run_name] if task['process'] == process]
+            tasks_by_process = [task for task in weighted_task_information_per_run[run_name] if task['process'] == process]
             process_scores_per_run[run_name].append(calculate_weighted_scores(tasks_by_process, process, limits))
         
-        full_score_per_run[run_name] = calculate_weighted_scores(normalized_task_information_per_run[run_name])
+        full_score_per_run[run_name] = calculate_weighted_scores(weighted_task_information_per_run[run_name])
 
-    return {"task_information": normalized_task_information_per_run, "process_scores": process_scores_per_run, "full_scores": full_score_per_run}
+    return {"task_information": weighted_task_information_per_run, "process_scores": process_scores_per_run, "full_scores": full_score_per_run}
 
 def get_per_process_worst_rss_ratios(process_name, tasks):
     ratios = [1 if task['vmem'] == 0 else task['rss'] / task['vmem'] for task in tasks if task['rss'] and task['vmem']]
@@ -155,7 +174,7 @@ def get_per_process_worst_rss_ratios(process_name, tasks):
     return {"ratio_average": ratio_average, "tasks": len(tasks), "process_name": process_name}
 
 def get_per_process_cpu_allocation_results(process_name, tasks):
-    cpu_penalties = [task['raw_cpu_penalty'] for task in tasks]
+    cpu_penalties = [task['raw_cpu_penalty'] for task in tasks if task['raw_cpu_penalty'] is not None]
     sum_penalty = sum(cpu_penalties)
     average_penalty = 0
     if len(cpu_penalties) > 0:
@@ -219,7 +238,7 @@ def get_cpu_allocation_average_over_tasks(tasks):
     """
 
 def get_per_process_memory_allocation_results(process_name, tasks):
-    memory_penalties = [task['raw_memory_penalty'] for task in tasks]
+    memory_penalties = [task['raw_memory_penalty'] for task in tasks if task['raw_memory_penalty'] is not None]
     sum_penalty = sum(memory_penalties)
     average_penalty = 0
     if len(memory_penalties) > 0:
@@ -247,7 +266,7 @@ def get_process_relation_data(tasks):
 
 
 def analyze(db: Session, grouped_processes, threshold_numbers):
-    result_scores = calculate_scores(db, grouped_processes, threshold_numbers)
+    result_scores = calculate_scores(grouped_processes, threshold_numbers)
     analysis = {}
 
 
@@ -279,8 +298,8 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         run_task_information = result_scores['task_information'][run_name]
         distinct_process_names = list(set([task['process'] for task in run_task_information]))
         
-        return_number_tasks = min([5, len(run_task_information)]) # could be more dynamic
-        return_number_processes = min([5, len(distinct_process_names)]) # as well
+        return_number_tasks = min([10, len(run_task_information)]) # could be more dynamic
+        return_number_processes = min([10, len(distinct_process_names)]) # as well
 
         # duration
         duration_sorted_list_descending = sorted(run_task_information, key=lambda task: task.get('realtime', -1) or -1, reverse=True)
