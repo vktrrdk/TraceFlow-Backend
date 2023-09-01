@@ -46,7 +46,7 @@ class RunTrace(Base):
     token = Column(String, nullable=False)
     run_name = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow())
-    hash = Column(String, nullable=True)
+    # hash = Column(String, nullable=True)
     task_id = Column(Integer, nullable=True)
     status = Column(String, nullable=True)
     process = Column(String, nullable=True)
