@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
+from fastapi.middleware.gzip import GZipMiddleware
 
 import crud, models, schemas, helpers
 from database import SessionLocal, engine
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware)
 
 def get_db():
     db = SessionLocal()
@@ -257,8 +259,15 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=400)
 
 
-@app.post("/run/info/{token_id}")
-async def get_run_information(token_id: str, threshold_params: dict = None, db: Session = Depends(get_db)):
+@app.post("/run/analysis/{token_id}")
+async def get_run_analysis(token_id: str, threshold_params: dict = None, db: Session = Depends(get_db)):
+    result_by_task = crud.get_task_states_by_token(db, token_id)
+    result_by_run_name = helpers.group_by_run_name(result_by_task)
+    result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
+    return JSONResponse(content=jsonable_encoder(result_analysis), status_code=200)
+
+@app.get("/run/info/{token_id}")
+async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     """
     Returns all information persisted for a certain token.
     :param token_id: The id of the run-token
@@ -272,18 +281,16 @@ async def get_run_information(token_id: str, threshold_params: dict = None, db: 
     if not token:
         return JSONResponse(content={"error": "No such token"}, status_code=404)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
+    result_meta = meta if len(meta) > 0 else {}
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_by_run_name = helpers.group_by_run_name(result_by_task)
-    result_meta = meta if len(meta) > 0 else {}
     result_stat = crud.get_stats_by_token(db, token_id)
-    result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
     result_meta_processes = crud.get_process_by_token(db, token_id)
     result = {
         "result_meta": result_meta,
         "result_by_run_name": result_by_run_name,
         "result_stat": result_stat,
         "result_meta_processes": result_meta_processes,
-        "result_analysis": result_analysis,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
 
