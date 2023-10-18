@@ -1,20 +1,32 @@
 import json
 from json import JSONDecodeError
 
-from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket
+from redis import Redis
+
+from rq import Queue
+
+from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from fastapi.middleware.gzip import GZipMiddleware
 
+from job import do_stuff
+
 import crud, models, schemas, helpers
+
+
 from database import SessionLocal, engine
 
 
 app = FastAPI(
     title="TraceFlow",
 )
+
+r_con = Redis(host='localhost', port=6379)
+request_queue = Queue("request_queue", connection=r_con)
+
 
 
 origins = [
@@ -250,10 +262,12 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=404)
     token = crud.get_token(db, token_id)
     if token:
-        print(token_id)
+        
         if crud.check_for_workflow_completed(db, json_ob, token_id):
             return Response(status_code=400)
-        crud.persist_trace(db, json_ob, token)
+        job_instance = request_queue.enqueue(do_stuff, json_ob)
+        print(job_instance.id)
+        #crud.persist_trace(db, json_ob, token)
         return Response(status_code=204)
     else:
         return Response(status_code=400)
@@ -265,6 +279,14 @@ async def get_run_analysis(token_id: str, threshold_params: dict = None, db: Ses
     result_by_run_name = helpers.group_by_run_name(result_by_task)
     result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
     return JSONResponse(content=jsonable_encoder(result_analysis), status_code=200)
+
+@app.post("/test/redis")
+async def test_redis(json_b: dict):
+    job_instance = request_queue.enqueue(do_stuff, json_b)
+    return {
+        "id": job_instance.id
+    }
+
 
 @app.get("/run/info/{token_id}")
 async def get_run_information(token_id: str, db: Session = Depends(get_db)):
