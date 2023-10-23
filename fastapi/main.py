@@ -12,7 +12,6 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from fastapi.middleware.gzip import GZipMiddleware
 
-from job import do_stuff
 
 import crud, models, schemas, helpers
 
@@ -265,9 +264,9 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         
         if crud.check_for_workflow_completed(db, json_ob, token_id):
             return Response(status_code=400)
-        job_instance = request_queue.enqueue(do_stuff, json_ob)
-        print(job_instance.id)
-        #crud.persist_trace(db, json_ob, token)
+        
+        job_instance = request_queue.enqueue(crud.persist_trace, json_ob, token)
+
         return Response(status_code=204)
     else:
         return Response(status_code=400)
@@ -282,7 +281,7 @@ async def get_run_analysis(token_id: str, threshold_params: dict = None, db: Ses
 
 @app.post("/test/redis")
 async def test_redis(json_b: dict):
-    job_instance = request_queue.enqueue(do_stuff, json_b)
+    job_instance = request_queue.enqueue(print, json_b)
     return {
         "id": job_instance.id
     }

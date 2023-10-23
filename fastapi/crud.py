@@ -1,9 +1,21 @@
 import json
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from fastapi import Depends
+
+from database import SessionLocal, engine, get_session
+
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine
 import string, random
 import models, schemas
+
+"""
+Change the Session for each database query, instead of using all the same!
+Also check, that the redis queue worker has the correct env variables set, so it is able to perform the session-creation
+Check performance with redis queue on cluster machine
+"""
+
 
 def get_user(db: Session, id: string):
     query = db.query(models.User).filter(models.User.id == id).first()
@@ -439,7 +451,10 @@ def check_for_workflow_completed(db: Session, json_ob: object, token_id: string)
     )
 
 
-def persist_trace(db: Session, json_ob, token):
+
+
+def persist_trace(json_ob, token):
+    db = get_session()
     metadata_saved = False
     trace_saved = False
     metadata = json_ob.get("metadata", None)
@@ -472,6 +487,7 @@ def persist_trace(db: Session, json_ob, token):
         db.commit()
         db.refresh(trace_object)
         trace_saved = True
+    db.close()
     return {"metadata_saved": metadata_saved, "trace_saved": trace_saved}
 
 
