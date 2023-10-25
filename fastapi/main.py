@@ -1,4 +1,5 @@
 import json
+import os
 from json import JSONDecodeError
 
 from redis import Redis
@@ -18,12 +19,13 @@ import crud, models, schemas, helpers
 
 from database import SessionLocal, engine
 
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
 
 app = FastAPI(
     title="TraceFlow",
 )
 
-r_con = Redis(host='localhost', port=6379)
+r_con = Redis(host=REDIS_HOST, port=6379)
 request_queue = Queue("request_queue", connection=r_con)
 
 
