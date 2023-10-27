@@ -86,9 +86,17 @@ def get_run_trace(db: Session, token: models.RunToken):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token.id).all()
 
 
+def timestamp_sort(obj):
+    if obj.complete is not None:
+        return obj.complete
+    elif obj.start is not None:
+        return obj.start
+    else:
+        return obj.submit
+
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
-    traces = sorted(traces, key=lambda obj: obj.timestamp, reverse=True)
+    traces = sorted(traces, key=timestamp_sort, reverse=True)
     by_task = []
     task_ids = []
     for trace in traces:
@@ -106,7 +114,7 @@ def get_run_trace_by_token(db: Session, token_id):
 
 
 def get_run_state_by_process(objects):
-    objects = sorted(objects, key=lambda obj: obj.timestamp, reverse=True)
+    objects = sorted(objects, key=timestamp_sort, reverse=True)
     processes_splitty = {}
     for entry in objects:
         if not entry.process in processes_splitty:
@@ -401,11 +409,24 @@ def get_process_data(json_ob, stat_id):
 def get_trace_data(json_obj, token_id):
     trace = json_obj.get("trace", None)
     if trace is not None:
+        start_time = trace.get("start", None)
+        if start_time is not None:
+            start_time = datetime.fromtimestamp(start_time / 1000)
+        submit_time = trace.get("submit", None)
+        if submit_time is not None:
+            submit_time = datetime.fromtimestamp(submit_time / 1000)
+        complete_time = trace.get("complete", None)
+        if complete_time is not None:
+            complete_time = datetime.fromtimestamp(complete_time / 1000)
+        
+        
         trace_data = {
             "token": token_id,
             "run_id": json_obj.get("runId", None),
             "run_name": json_obj.get("runName", None),
-            "timestamp": datetime.utcnow(),
+            "start": start_time,
+            "submit": submit_time,
+            "complete": complete_time,
             "task_id": trace.get("task_id", None),
             "status": trace.get("status", None),
             "process": trace.get("process", None),

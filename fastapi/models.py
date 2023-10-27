@@ -23,6 +23,7 @@ class AddUserItem(BaseModel):
     name: str
 
 
+
 """
 Database models
 """
@@ -45,7 +46,9 @@ class RunTrace(Base):
     run_id = Column(String, nullable=True) # runId
     token = Column(String, nullable=False)
     run_name = Column(String)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow())
+    submit = Column(DateTime, nullable=True)
+    start = Column(DateTime, nullable=True)
+    complete = Column(DateTime, nullable=True)
     # hash = Column(String, nullable=True)
     task_id = Column(Integer, nullable=True)
     status = Column(String, nullable=True)
