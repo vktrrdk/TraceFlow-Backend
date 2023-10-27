@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import Depends
 
-from database import SessionLocal, engine, get_session
+from database import engine, get_session
 
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
