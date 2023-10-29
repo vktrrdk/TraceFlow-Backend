@@ -478,7 +478,44 @@ def check_for_workflow_completed(db: Session, json_ob: object, token_id: string)
     Set the information of the corresponding values, when they are newer than the one available
     So if a certain task-id (they are unique!) trace gets in, check if the information is "newer" 
     --> submitted - started - completed: update all relevant fields accordingly, instead of saving 3 traces for the same job!
-"""
+
+    consider the following code:
+    from fastapi import FastAPI, HTTPException
+from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, select
+
+app = FastAPI()
+
+# Create a SQLAlchemy engine to connect to the PostgreSQL database
+engine = create_engine('postgresql://username:password@localhost/database_name')
+
+metadata = MetaData()
+trace_table = Table('trace', metadata,
+    Column('id', Integer, primary_key=True),
+    Column('trace_id', String),
+    Column('state', String),
+    Column('timestamp', String)  # Use a proper timestamp type
+)
+
+@app.put("/update_trace_state/{trace_id}/{new_state}")
+def update_trace_state(trace_id: str, new_state: str):
+    # Start a transaction and acquire a lock on the selected row
+    with engine.begin() as conn:
+        stmt = select([trace_table]).where(trace_table.c.trace_id == trace_id).with_for_update()
+        result = conn.execute(stmt)
+        row = result.fetchone()
+
+        if row:
+            # Perform your modifications to the row
+            row.state = new_state
+            # Update the row in the database
+            conn.execute(trace_table.update().values(state=new_state).where(trace_table.c.trace_id == trace_id))
+        else:
+            raise HTTPException(status_code=404, detail="Trace not found")
+
+    # The lock is released when the transaction is committed or rolled back
+    return {"message": "Trace state updated successfully"}
+
+"""    
 
 def persist_trace(json_ob, token):
     db = get_session()
