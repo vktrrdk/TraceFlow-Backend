@@ -272,6 +272,8 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=204)
     else:
         return Response(status_code=400)
+    
+    
 
 
 @app.post("/run/analysis/{token_id}")
@@ -289,6 +291,14 @@ async def test_redis(json_b: dict):
     }
 
 
+"""
+    what needs to be adjusted:
+    From the database, only get the relevant traces -> for each job, only the latest one
+    --> reduces data up to 3 times
+    --> relies on good persistence
+    
+    
+"""
 @app.get("/run/info/{token_id}")
 async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     """
@@ -316,6 +326,8 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
         "result_meta_processes": result_meta_processes,
     }
     return JSONResponse(content=jsonable_encoder(result), status_code=200)
+"""
+"""
 
 """
 @app.websocket("/run/{token}")

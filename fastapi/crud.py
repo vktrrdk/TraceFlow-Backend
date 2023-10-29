@@ -472,7 +472,13 @@ def check_for_workflow_completed(db: Session, json_ob: object, token_id: string)
     )
 
 
-
+"""
+    What needs to be adjusted:
+    When persisting a trace for a job, do the following:
+    Set the information of the corresponding values, when they are newer than the one available
+    So if a certain task-id (they are unique!) trace gets in, check if the information is "newer" 
+    --> submitted - started - completed: update all relevant fields accordingly, instead of saving 3 traces for the same job!
+"""
 
 def persist_trace(json_ob, token):
     db = get_session()
