@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 import string, random
 import models, schemas
 
+
 """
 Change the Session for each database query, instead of using all the same!
 Also check, that the redis queue worker has the correct env variables set, so it is able to perform the session-creation
@@ -96,6 +97,8 @@ def timestamp_sort(obj):
 
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
+    traces_test = db.query(models.RunTrace).all()
+    print(len(traces_test))
     traces = sorted(traces, key=timestamp_sort, reverse=True)
     by_task = []
     task_ids = []
@@ -518,6 +521,7 @@ def update_trace_state(trace_id: str, new_state: str):
 """    
 
 def persist_trace(json_ob, token):
+    print(json_ob.keys())
     db = get_session()
     metadata_saved = False
     trace_saved = False
@@ -543,6 +547,8 @@ def persist_trace(json_ob, token):
             db.refresh(process_object)
     
     trace = json_ob.get("trace")
+    #print(trace)
+    #print(json_ob)
     if trace is not None:
         trace_data = get_trace_data(json_ob, token.id)
         trace_object = models.RunTrace(**trace_data)
