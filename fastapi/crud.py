@@ -521,7 +521,6 @@ def update_trace_state(trace_id: str, new_state: str):
 """    
 
 def persist_trace(json_ob, token):
-    print(json_ob.keys())
     db = get_session()
     metadata_saved = False
     trace_saved = False
@@ -547,15 +546,24 @@ def persist_trace(json_ob, token):
             db.refresh(process_object)
     
     trace = json_ob.get("trace")
-    #print(trace)
-    #print(json_ob)
     if trace is not None:
         trace_data = get_trace_data(json_ob, token.id)
         trace_object = models.RunTrace(**trace_data)
-           
-        db.add(trace_object)
+        existing_trace_obj = db.query(models.RunTrace).filter(
+            models.RunTrace.task_id == trace_object.task_id, 
+            models.RunTrace.token == trace_object.token
+        ).first()
+        print(existing_trace_obj)
+        print(trace_object)
+        if existing_trace_obj:
+            trace_object.id = existing_trace_obj.id
+            object_to_update = db.merge(trace_object)
+        else:
+            db.add(trace_object)
+            object_to_update = trace_object
+
         db.commit()
-        db.refresh(trace_object)
+        db.refresh(object_to_update)
         trace_saved = True
     db.close()
     return {"metadata_saved": metadata_saved, "trace_saved": trace_saved}
