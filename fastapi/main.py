@@ -27,6 +27,7 @@ app = FastAPI(
 
 r_con = Redis(host=REDIS_HOST, port=6379)
 request_queue = Queue("request_queue", connection=r_con)
+calculation_queue = Queue("calculation_queue", connection=r_con)
 
 
 
@@ -268,6 +269,7 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
             return Response(status_code=400)
         
         job_instance = request_queue.enqueue(crud.persist_trace, json_ob, token)
+        #second_job_instance = calculation_queue()
 
         return Response(status_code=204)
     else:
