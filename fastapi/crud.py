@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import Depends
 
-from database import engine, get_session
+from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
@@ -521,8 +521,10 @@ def update_trace_state(trace_id: str, new_state: str):
 """    
 
 def persist_trace(json_ob, token):
-    print(json_ob.keys())
+  
     db = get_session()
+    
+
     metadata_saved = False
     trace_saved = False
     metadata = json_ob.get("metadata", None)
@@ -561,7 +563,48 @@ def persist_trace(json_ob, token):
     return {"metadata_saved": metadata_saved, "trace_saved": trace_saved}
 
 
+async def persist_trace_async(json_ob, token_id):
+    """
+    CONSIDER: token_id needs to be checked
+    """
+    async_db = get_async_session()
+    metadata_saved = False
+    trace_saved = False
+    metadata = json_ob.get("metadata", None)
+    if metadata is not None:
+        metadata_data = get_metadata_data(json_ob, token_id)
+        meta_object = models.RunMetadata(**metadata_data)
+        async_db.add(meta_object)
+        async_db.commit()
+        async_db.refresh(meta_object)
+        
+        stat_data = get_stat_data(json_ob, meta_object.id)
+        stat_object = models.Stat(**stat_data)
+        async_db.add(stat_object)
+        async_db.commit()
+        async_db.refresh(stat_object)
 
+        processes_data = get_process_data(json_ob, stat_object.id)
+        for process_data in processes_data:
+            process_object = models.Process(**process_data)
+            async_db.add(process_object)
+            async_db.commit()
+            async_db.refresh(process_object)
+    
+    trace = json_ob.get("trace")
+    #print(trace)
+    #print(json_ob)
+    if trace is not None:
+        trace_data = get_trace_data(json_ob, token_id)
+        trace_object = models.RunTrace(**trace_data)
+           
+        async_db.add(trace_object)
+        async_db.commit()
+        async_db.refresh(trace_object)
+        trace_saved = True
+    async_db.close()
+    return {"metadata_saved": metadata_saved, "trace_saved": trace_saved}
+    
 
 
 

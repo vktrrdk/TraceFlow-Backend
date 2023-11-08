@@ -1,6 +1,7 @@
 import json
 import os
 from json import JSONDecodeError
+import asyncio
 
 from redis import Redis
 
@@ -259,6 +260,7 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
     :param json_ob: The request json object including e.g. the trace
     :param db: The database to persist the information in
     :return: Response state
+    # # # TODO: adjust checking to be part of the persistence function --> give it to the worker instead of doing it with main component
     """
     if not token_id:
         return Response(status_code=404)
@@ -275,7 +277,11 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
     else:
         return Response(status_code=400)
     
-    
+
+@app.post("run/async/{token_id}")
+async def persist_run_for_token_async(token_id: str, json_ob: dict):
+    job_instance = request_queue.enqueue(asyncio.run(crud.perist_trace_async(json_ob, token_id)))
+    return Response(status_code=204)
 
 
 @app.post("/run/analysis/{token_id}")

@@ -2,7 +2,7 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncAttrs, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 PG_USER = os.environ.get('POSTGRES_USER', 'postgres')
@@ -17,7 +17,7 @@ SQLALCHEMY_DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_P
 SQLALCHEMY_ASYNC_DATABASE_URL = f"postgresql+asyncpg://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}" # check thsi!
 #SQLALCHEMY_DATABASE_URL = "postgresql://postgres:pgpassword1@localhost:5432/nextflow_analysis"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
-test_engine = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True) # check this!
+asyncSession = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True) # check this!
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -26,3 +26,8 @@ def get_session():
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return SessionLocal()
+
+def get_async_session():
+    async_engine = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True)
+    async_session = async_sessionmaker(async_engine, expire_on_commit=False)
+    return async_session

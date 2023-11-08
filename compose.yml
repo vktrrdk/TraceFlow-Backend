@@ -45,21 +45,22 @@ services:
       - POSTGRES_HOST=nfa_db
 
 
-  redis_calculate_worker:
-    build:
-      dockerfile: Dockerfile.redis
-      context: ./fastapi
-    depends_on: 
-      - redis
-    command: rq worker alculation_queue
-    networks:
-      - api_network
-    environment:
-      - REDIS_HOST=nfa_redis
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=nfa_db
+  #redis_calculate_worker: ### future idea: does it make sense to process the UI-requests using calculation workers? 
+  ### or is it better to have them running in the background and to adjust/create database entries? 
+  #  build:
+  #    dockerfile: Dockerfile.redis
+  #    context: ./fastapi
+  #  depends_on: 
+  #    - redis
+  #  command: rq worker calculation_queue
+  #  networks:
+  #    - api_network
+  #  environment:
+  #    - REDIS_HOST=nfa_redis
+  #    - POSTGRES_USER=${POSTGRES_USER}
+  #    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #    - POSTGRES_DB=${POSTGRES_DB}
+  #    - POSTGRES_HOST=nfa_db
 
 networks:
   api_network:
