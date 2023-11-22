@@ -1,6 +1,7 @@
 import json
 import os
 from json import JSONDecodeError
+
 import asyncio
 
 from redis import Redis
@@ -9,7 +10,7 @@ from rq import Queue
 
 from fastapi import Depends, FastAPI, Query, HTTPException, WebSocket, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response, JSONResponse, ORJSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from fastapi.middleware.gzip import GZipMiddleware
@@ -279,12 +280,12 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         return Response(status_code=400)
     
 
-@app.post("/run/analysis/{token_id}")
-async def get_run_analysis(token_id: str, threshold_params: dict = None, db: Session = Depends(get_db)):
+@app.post("/run/analysis/{token_id}/")
+async def get_run_analysis(token_id: str, threshold_params: dict = None, db: Session = Depends(get_db), response_class=ORJSONResponse):
     result_by_task = crud.get_task_states_by_token(db, token_id)
     result_by_run_name = helpers.group_by_run_name(result_by_task)
     result_analysis = helpers.analyze(db, result_by_run_name, threshold_params)
-    return JSONResponse(content=jsonable_encoder(result_analysis), status_code=200)
+    return ORJSONResponse(result_analysis, status_code=200)
 
 @app.post("/test/redis")
 async def test_redis(json_b: dict):
@@ -302,8 +303,8 @@ async def test_redis(json_b: dict):
     
     
 """
-@app.get("/run/info/{token_id}")
-async def get_run_information(token_id: str, db: Session = Depends(get_db)):
+@app.get("/run/info/{token_id}/")
+async def get_run_information(token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
     """
     Returns all information persisted for a certain token.
     :param token_id: The id of the run-token
@@ -312,10 +313,10 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db)):
     :return: information on run with token
     """
     if not token_id:
-        return JSONResponse(content={"error": "No token provided"}, status_code=200)
+        return ORJSONResponse({"error": "No token provided"}, status_code=400)
     token = crud.get_token(db, token_id)
     if not token:
-        return JSONResponse(content={"error": "No such token"}, status_code=404)
+        return ORJSONResponse({"error": "No such token"}, status_code=404)
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_meta = meta if len(meta) > 0 else {}
     result_by_task = crud.get_task_states_by_token(db, token_id)
