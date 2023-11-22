@@ -169,5 +169,4 @@ class RunMetadata(Base):
     revision = Column(String, nullable=True) #metadata:workflow:revision
     work_dir = Column(String, nullable=True) #metadata:workflow:workDir
     user_name = Column(String, nullable=True) #metadata:workflow:userName
-
  

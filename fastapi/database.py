@@ -17,7 +17,7 @@ SQLALCHEMY_DATABASE_URL = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_P
 SQLALCHEMY_ASYNC_DATABASE_URL = f"postgresql+asyncpg://{PG_USER}:{PG_PASSWORD}@{PG_HOST}:{PG_PORT}/{PG_DB}" # check thsi!
 #SQLALCHEMY_DATABASE_URL = "postgresql://postgres:pgpassword1@localhost:5432/nextflow_analysis"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
-asyncSession = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True) # check this!
+asyncSession = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True, connect_args={"server_settings": {"jit": "off"}},) # check this!
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -30,4 +30,4 @@ def get_session():
 def get_async_session():
     async_engine = create_async_engine(SQLALCHEMY_ASYNC_DATABASE_URL, echo=True)
     async_session = async_sessionmaker(async_engine, expire_on_commit=False)
-    return async_session
+    return async_session()

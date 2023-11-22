@@ -29,12 +29,17 @@ services:
       - api_network
 
   redis_persist_worker:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     build:
       dockerfile: Dockerfile.redis
       context: ./fastapi
     depends_on: 
       - redis
-    command: rq worker request_queue
+    command: python start_worker.py
     networks:
       - api_network
     environment:
