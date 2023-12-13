@@ -282,7 +282,12 @@ def get_metadata_data(json_ob, token_id):
     run_name = json_ob.get("runName", None)
     run_id = json_ob.get("runId", None)
     event = json_ob.get("event", None)
-    timestamp = json_ob.get("utcTime", datetime.utcnow())
+    timestamp = json_ob.get("utcTime", "")
+    if timestamp == "":
+        timestamp = datetime.utcnow()
+    else:
+        timestamp_format = "%Y-%m-%dT%H:%M:%SZ"
+        timestamp = datetime.strptime(timestamp, timestamp_format)
     command_line = None
     error_message = None
     script_file = None
@@ -583,6 +588,7 @@ async def persist_trace_async(json_ob, token_id):
     """
 
     async_db = get_async_session()
+    print(json_ob.keys())
     metadata = json_ob.get("metadata", None)
     if metadata is not None:
         metadata_data = get_metadata_data(json_ob, token_id)
@@ -593,7 +599,7 @@ async def persist_trace_async(json_ob, token_id):
         processes_data = get_process_data(json_ob, stat_object.id)
         for process_data in processes_data:
                 process_object = models.Process(**process_data)
-                process_object_list.append(process_object_list)
+                process_object_list.append(process_object)
 
         await persist_object_data(async_db, meta_object)
         await persist_object_data(async_db, stat_object)
