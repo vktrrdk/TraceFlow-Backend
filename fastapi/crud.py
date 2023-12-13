@@ -564,66 +564,49 @@ def persist_trace(json_ob, token):
     return {"metadata_saved": metadata_saved, "trace_saved": trace_saved}
 
 
+async def persist_object_data(async_session, add_object):
+    async with async_session.begin():
+        async_session.add(add_object)
+    await async_session.commit()
+
+
+async def persist_object_list_data(async_session, add_object_list):
+    async with async_session.begin():
+        async_session.add_all(add_object_list)
+    await async_session.commit()
+
+
 async def persist_trace_async(json_ob, token_id):
     """
     CONSIDER: token_id needs to be checked # TODO: implement check
+    NEXT IMPLEMENTATION STEP!
     """
-    start_time_full = time.time()
+
     async_db = get_async_session()
-    async with async_db.begin() as conn:
-       
-        metadata = json_ob.get("metadata", None)
-        if metadata is not None:
-            start_time_meta_json = time.time()
-            metadata_data = get_metadata_data(json_ob, token_id)
-            meta_object = models.RunMetadata(**metadata_data)
-            end_time_meta_json = time.time()  
-            logger.info(f"Meta json time: {end_time_meta_json - start_time_meta_json}")
-            start_time_meta_persist = time.time()
-            async_db.add(meta_object)
-            async_db.commit()
-            async_db.refresh(meta_object)
-            end_time_meta_persist = time.time()
-            logger.info(f"Meta persist time: {end_time_meta_persist - start_time_meta_persist}")
-            start_time_stat_json = time.time()
-            stat_data = get_stat_data(json_ob, meta_object.id)
-            stat_object = models.Stat(**stat_data)
-            end_time_stat_json = time.time()
-            logger.info(f"Stat json time: {end_time_stat_json - start_time_stat_json}")
-            start_time_stat_persist = time.time()
-            async_db.add(stat_object)
-            async_db.commit()
-            async_db.refresh(stat_object)
-            end_time_stat_persist = time.time()
-            logger.info(f"Stat persist time: {end_time_stat_persist - start_time_stat_persist}")
-
-            processes_data = get_process_data(json_ob, stat_object.id)
-            for process_data in processes_data:
+    metadata = json_ob.get("metadata", None)
+    if metadata is not None:
+        metadata_data = get_metadata_data(json_ob, token_id)
+        meta_object = models.RunMetadata(**metadata_data)
+        stat_data = get_stat_data(json_ob, meta_object.id)
+        stat_object = models.Stat(**stat_data)
+        process_object_list = []
+        processes_data = get_process_data(json_ob, stat_object.id)
+        for process_data in processes_data:
                 process_object = models.Process(**process_data)
-                async_db.add(process_object)
-                async_db.commit()
-                async_db.refresh(process_object)
-      
-        trace = json_ob.get("trace")
-        if trace is not None:
-            start_time_trace_json = time.time()
-            trace_data = get_trace_data(json_ob, token_id)
-            trace_object = models.RunTrace(**trace_data)
-            end_time_trace_json = time.time()
-            logger.info(f"Trace json time: {end_time_trace_json - start_time_trace_json}")
-            start_time_trace_persist = time.time()
-            async_db.add(trace_object)
-            async_db.commit()
-            async_db.refresh(trace_object)
-            end_time_trace_persist = time.time()
-            logger.info(f"Trace persist time: {end_time_trace_persist - start_time_trace_persist}")
+                process_object_list.append(process_object_list)
+
+        await persist_object_data(async_db, meta_object)
+        await persist_object_data(async_db, stat_object)
+        if len(process_object_list) > 0:
+            await persist_object_list_data(async_db, process_object_list)
+            
+    trace = json_ob.get("trace")
         
-        end_time_full = time.time()
-        logger.info(f"Full time for persist: {end_time_full - start_time_full}")
-
-        async_db.close()
-    
-
+    if trace is not None:
+        trace_data = get_trace_data(json_ob, token_id)
+        trace_object = models.RunTrace(**trace_data)
+        
+        await persist_object_data(async_db, trace_object)
 
 
 def create_random_token():
