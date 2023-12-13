@@ -270,7 +270,7 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
         
         if crud.check_for_workflow_completed(db, json_ob, token_id):
             return Response(status_code=400)
-        
+        print(f"Number of jobs in queue on enqueue: {len(request_queue.jobs)}")
         job_instance = request_queue.enqueue(crud.persist_trace_async, json_ob, token_id)
         # what to do with the job instance?
         #second_job_instance = calculation_queue()

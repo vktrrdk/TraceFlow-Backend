@@ -2,6 +2,7 @@ from redis import Redis
 import os
 from rq import Worker, Queue, Connection
 import logging
+import models, crud, main
 
 REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
 r_con = Redis(host=REDIS_HOST, port=6379)

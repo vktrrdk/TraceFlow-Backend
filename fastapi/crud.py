@@ -568,8 +568,10 @@ async def persist_trace_async(json_ob, token_id):
     """
     CONSIDER: token_id needs to be checked # TODO: implement check
     """
+    start_time_full = time.time()
     async_db = get_async_session()
-    async with async_db.begin():
+    async with async_db.begin() as conn:
+       
         metadata = json_ob.get("metadata", None)
         if metadata is not None:
             start_time_meta_json = time.time()
@@ -615,6 +617,10 @@ async def persist_trace_async(json_ob, token_id):
             async_db.refresh(trace_object)
             end_time_trace_persist = time.time()
             logger.info(f"Trace persist time: {end_time_trace_persist - start_time_trace_persist}")
+        
+        end_time_full = time.time()
+        logger.info(f"Full time for persist: {end_time_full - start_time_full}")
+
         async_db.close()
     
 

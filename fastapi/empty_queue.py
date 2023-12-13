@@ -4,7 +4,6 @@ from rq import Worker, Queue, Connection
 import logging
 
 REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 r_con = Redis(host=REDIS_HOST, port=6379)
 
 if __name__ == '__main__':
