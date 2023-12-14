@@ -302,6 +302,24 @@ async def test_redis(json_b: dict):
     
     
 """
+
+@app.get("/run/ram_plot/{token_id}")
+async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db: Session = Depends(get_db), response_class=ORJSONResponse):
+    if not token_id:
+        return ORJSONResponse({"error": "No token provided"}, status_code=400)
+    token = crud.get_token(db, token_id)
+    if not token:
+        return ORJSONResponse({"error": "No such token"}, status_code=404)
+
+    process_filter = json.loads(processFilter)
+    tag_filter = json.loads(tagFilter)
+    run_name = json.loads(runName)
+    filtered_ram_plot_results = crud.get_filtered_ram_plot_results(db, token_id, run_name,process_filter, tag_filter)
+    
+    return ORJSONResponse(content=jsonable_encoder(filtered_ram_plot_results), status_code=200)
+    
+
+
 @app.get("/run/info/{token_id}/")
 async def get_run_information(token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
     """

@@ -8,8 +8,9 @@ from database import engine, get_session, get_async_session
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, select
 import string, random
-import models, schemas
+import models, schemas, helpers
 import logging
+import numpy as np
 
 logger = logging.getLogger('rq.worker')
 
@@ -99,18 +100,7 @@ def timestamp_sort(obj):
 
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
-    traces = sorted(traces, key=timestamp_sort, reverse=True)
-    by_task = []
-    task_ids = []
-    for trace in traces:
-        if not trace.task_id in task_ids:
-            task_ids.append(trace.task_id)
-            by_task.append(trace)
-        else:
-            tasks_with_same_id_and_name = [obj for obj in by_task if obj.task_id == trace.task_id and obj.run_name == trace.run_name]
-            if not any(obj.run_id == trace.run_id and obj.run_name == trace.run_name for obj in tasks_with_same_id_and_name):
-                by_task.append(trace);
-    return by_task
+    return traces
 
 def get_run_trace_by_token(db: Session, token_id):
     return db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
@@ -525,6 +515,86 @@ def update_trace_state(trace_id: str, new_state: str):
 
 """    
 
+"""
+PLOT DATA RETRIEVAL BELOW
+"""
+
+def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    
+    grouped_traces = helpers.group_by_process(traces)
+    process_boxplot_values = {}
+    for process, tasks in grouped_traces.items():
+        percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
+
+        # Calculate quartiles and other boxplot values using numpy
+        q1 = np.percentile(percentage_values, 25)
+        median = np.percentile(percentage_values, 50)
+        q3 = np.percentile(percentage_values, 75)
+        min_val = np.min(percentage_values)
+        max_val = np.max(percentage_values)
+
+        # Store the calculated values for the group
+        process_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+    return [list(grouped_traces.keys()), process_boxplot_values], 
+
+
+"""
+
+FURTHER TODO: add the labels to the response 
+
+example data for precalculated boxplots:
+
+const data: ChartConfiguration<'boxplot'>['data'] = {
+  labels: ['array', '{boxplot values}', 'with items', 'as outliers'],
+  datasets: [
+    {
+      label: 'Dataset 1',
+      borderWidth: 1,
+      itemRadius: 2,
+      itemStyle: 'circle',
+      itemBackgroundColor: '#000',
+      outlierBackgroundColor: '#000',
+      data: [
+        [1, 2, 3, 4, 5, 11],
+        {
+          min: 1,
+          q1: 2,
+          median: 3,
+          q3: 4,
+          max: 5,
+        },
+        {
+          min: 1,
+          q1: 2,
+          median: 3,
+          q3: 4,
+          max: 5,
+          items: [1, 2, 3, 4, 5],
+        },
+        {
+          min: 1,
+          q1: 2,
+          median: 3,
+          q3: 4,
+          max: 5,
+          outliers: [11],
+        },
+      ],
+    },
+  ],
+};
+
+"""
+
+    
+
 def persist_trace(json_ob, token):
   
     db = get_session()
@@ -581,13 +651,21 @@ async def persist_singleton_trace_data(async_session, trace_object: models.RunTr
                 models.RunTrace.run_id == trace_object.run_id,
             )
         )
-        task_trace_object = result_traces.fetchone()
+        
+        task_trace_object = result_traces.first()
         if task_trace_object:
-            await async_session.delete(task_trace_object)
-        async_session.add(trace_object)
-    await async_session.commit()
+            # this needs to be adjust! seems like some adds are still slipping through - e.g when during retrieval of the object there is a an update -->
+            # check for race condition fix
+            task_trace_object = task_trace_object[0]
+            if helpers.has_newer_state(task_trace_object, trace_object):
+                await async_session.delete(task_trace_object)
+                async_session.add(trace_object)
+        else:
+            async_session.add(trace_object)
+        await async_session.commit()
 
         
+
 
 
 async def persist_object_list_data(async_session, add_object_list):

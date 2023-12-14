@@ -2,6 +2,8 @@ import json
 from datetime import datetime
 import sys
 import math
+from itertools import groupby
+from operator import attrgetter
 
 from sqlalchemy.orm import Session
 import string, random
@@ -11,6 +13,8 @@ import models, schemas, crud
 """
 Analysis part
 """
+
+STATUS_SORTING = ["SUBMITTED", "RUNNING", "ABORTED", "FAILED", "COMPLETED"]
 interval_valid_ram_relation = (0.6, 1.2)  # from 60 to 120%
 interval_valid_cpu_allocation_percentage = (60, 140)  # from 60 to 140%
 interval_valid_ram_allocation = (60, 100)
@@ -438,6 +442,12 @@ def sort_values_per_run(run_duration_data, key_name, reverse=False):
     return per_run_mapping
 
 
+def has_newer_state(old_trace_entry: models.RunTrace, new_trace_entry: models.RunTrace):
+    old_status, new_status = old_trace_entry.status, new_trace_entry.status
+    return STATUS_SORTING.index(new_status) > STATUS_SORTING.index(old_status)
+    
+
+
 def group_runwise(data):
     run_groups = {}
     for item in data: 
@@ -638,6 +648,12 @@ def group_by_run_name(result_by_task):
             run_name_dictionary[process.run_name].append(process)
 
     return run_name_dictionary
+
+
+def group_by_process(traces):
+    grouped_traces = {key: list(process_group) for key, process_group in groupby(sorted(traces, key=attrgetter('process')), key=attrgetter('process'))}
+    return grouped_traces
+
 
 
 """
