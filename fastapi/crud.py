@@ -6,7 +6,7 @@ from fastapi import Depends
 from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 import string, random
 import models, schemas
 import logging
@@ -99,8 +99,6 @@ def timestamp_sort(obj):
 
 def get_task_states_by_token(db: Session, token_id):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id).all()
-    traces_test = db.query(models.RunTrace).all()
-    print(len(traces_test))
     traces = sorted(traces, key=timestamp_sort, reverse=True)
     by_task = []
     task_ids = []
@@ -574,6 +572,23 @@ async def persist_object_data(async_session, add_object):
         async_session.add(add_object)
     await async_session.commit()
 
+async def persist_singleton_trace_data(async_session, trace_object: models.RunTrace):
+    async with async_session.begin():
+        result_traces = await async_session.execute(
+            select(models.RunTrace).where(
+                models.RunTrace.task_id == trace_object.task_id,
+                models.RunTrace.token == trace_object.token, 
+                models.RunTrace.run_id == trace_object.run_id,
+            )
+        )
+        task_trace_object = result_traces.fetchone()
+        if task_trace_object:
+            await async_session.delete(task_trace_object)
+        async_session.add(trace_object)
+    await async_session.commit()
+
+        
+
 
 async def persist_object_list_data(async_session, add_object_list):
     async with async_session.begin():
@@ -583,12 +598,11 @@ async def persist_object_list_data(async_session, add_object_list):
 
 async def persist_trace_async(json_ob, token_id):
     """
-    CONSIDER: token_id needs to be checked # TODO: implement check
-    NEXT IMPLEMENTATION STEP!
+    CONSIDER: token_id needs to be checked # 
+    TODO: implement check
     """
 
     async_db = get_async_session()
-    print(json_ob.keys())
     metadata = json_ob.get("metadata", None)
     if metadata is not None:
         metadata_data = get_metadata_data(json_ob, token_id)
@@ -612,7 +626,7 @@ async def persist_trace_async(json_ob, token_id):
         trace_data = get_trace_data(json_ob, token_id)
         trace_object = models.RunTrace(**trace_data)
         
-        await persist_object_data(async_db, trace_object)
+        await persist_singleton_trace_data(async_db, trace_object)
 
 
 def create_random_token():
