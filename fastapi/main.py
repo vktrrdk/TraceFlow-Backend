@@ -304,24 +304,14 @@ async def test_redis(json_b: dict):
 """
 
 
-"""
 
- TODO: this should be an own function
- if not token_id:
-        return ORJSONResponse({"error": "No token provided"}, status_code=400)
-    token = crud.get_token(db, token_id)
-    if not token:
-        return ORJSONResponse({"error": "No such token"}, status_code=404)
-"""
 
 @app.get("/run/table/{token_id}")
 async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse, page=1, rows=10, sortField="task_id", sortOrder=1):
-    if not token_id:
-        return ORJSONResponse({"error": "No token provided"}, status_code=400)
-    token = crud.get_token(db, token_id)
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
     
-    if not token:
-        return ORJSONResponse({"error": "No such token"}, status_code=404)
     run_name = json.loads(runName)
     page = json.loads(page)
     rows = json.loads(rows)
@@ -334,12 +324,10 @@ async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), 
 
 @app.get("/run/ram_plot/{token_id}")
 async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db: Session = Depends(get_db), response_class=ORJSONResponse):
-    if not token_id:
-        return ORJSONResponse({"error": "No token provided"}, status_code=400)
-    token = crud.get_token(db, token_id)
-    if not token:
-        return ORJSONResponse({"error": "No such token"}, status_code=404)
-
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+    
     process_filter = json.loads(processFilter)
     tag_filter = json.loads(tagFilter)
     run_name = json.loads(runName)
@@ -348,6 +336,43 @@ async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db
     
     return ORJSONResponse(content=jsonable_encoder(filtered_ram_plot_results), status_code=200)
     
+@app.get("/run/cpu_allocation_plot/{token_id}")
+async def get_cpu_allocation_plot_data(token_id: str, processFilter, tagFilter, runName,  db: Session = Depends(get_db), response_class=ORJSONResponse):
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+
+    process_filter = json.loads(processFilter)
+    tag_filter = json.loads(tagFilter)
+    run_name = json.loads(runName)
+
+    filtered_cpu_plot_results = crud.get_filtered_cpu_allocation_plot_results(db, token_id, run_name, process_filter, tag_filter)
+
+    return ORJSONResponse(content=jsonable_encoder(filtered_cpu_plot_results), status_code=200)
+
+
+### TODO: use this! implement function in crud and use response in ui
+@app.get("/run/plots/{token_id}")
+async def get_plot_data(token_id: str, processFilter, tagFilter, runName,  db: Session = Depends(get_db), response_class=ORJSONResponse):
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+
+    process_filter = json.loads(processFilter)
+    tag_filter = json.loads(tagFilter)
+    run_name = json.loads(runName)
+
+    full_plot_results = crud.get_plot_results(db, token_id, run_name, process_filter, tag_filter)
+    
+    return ORJSONResponse(content=jsonable_encoder(full_plot_results), status_code=200)
+
+async def check_token_request(token_id, db: Session):
+    if not token_id:
+        return ORJSONResponse({"error": "No token provided"}, status_code=400)
+    token = crud.get_token(db, token_id)
+    if not token:
+        return ORJSONResponse({"error": "No such token"}, status_code=404)
+    return token
 
 
 @app.get("/run/info/{token_id}/")
@@ -359,11 +384,10 @@ async def get_run_information(token_id: str, db: Session = Depends(get_db), resp
     :param db:
     :return: information on run with token
     """
-    if not token_id:
-        return ORJSONResponse({"error": "No token provided"}, status_code=400)
-    token = crud.get_token(db, token_id)
-    if not token:
-        return ORJSONResponse({"error": "No such token"}, status_code=404)
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+    
     meta = sorted(crud.get_meta_by_token(db, token_id), key=lambda obj: obj.timestamp)
     result_meta = meta if len(meta) > 0 else {}
     result_by_task = crud.get_task_states_by_token(db, token_id)

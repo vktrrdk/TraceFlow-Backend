@@ -466,7 +466,7 @@ def get_paginated_table(db: Session, token_id: str, run_name, page, rows, sort_f
     if sort_field is None or sort_field == "null" or sort_field == "":
         sort_field = "task_id"
     print(sort_order)
-    sort_method = sort_field if sort_order == 1 or sort_order is None or sort_order is "null" else desc(sort_field) 
+    sort_method = sort_field if sort_order == 1 or sort_order is None or sort_order == "null" else desc(sort_field) 
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).order_by(sort_method).offset(offset).limit(10).all()
     return traces
 
@@ -529,8 +529,59 @@ def update_trace_state(trace_id: str, new_state: str):
 
 """
 PLOT DATA RETRIEVAL BELOW
+
+! -- this should be refactored, so only one request is made and all plot data is returned via this single request! would prevent multiple database queries
+FILTERING needs to be implemented!
 """
 
+def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    
+    grouped_traces = helpers.group_by_process(traces)
+    relative_ram_boxplot_values = {}
+    cpu_allocation_boxplot_values = {}
+
+    for process, tasks in grouped_traces.items():
+        percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
+
+        q1 = np.percentile(percentage_values, 25)
+        median = np.percentile(percentage_values, 50)
+        q3 = np.percentile(percentage_values, 75)
+        min_val = np.min(percentage_values)
+        max_val = np.max(percentage_values)
+
+        relative_ram_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+
+        allocation_values = [task.cpu_percentage / task.cpus for task in tasks if task.cpu_percentage and task.cpus]
+        
+        q1 = np.percentile(allocation_values, 25)
+        median = np.percentile(allocation_values, 50)
+        q3 = np.percentile(allocation_values, 75)
+        min_val = np.min(allocation_values)
+        max_val = np.max(allocation_values)
+
+        cpu_allocation_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+    
+    full_plot_data = {
+        "relative_ram": [list(grouped_traces.keys()), relative_ram_boxplot_values],
+        "cpu_allocation": [list(grouped_traces.keys()), cpu_allocation_boxplot_values]
+    }
+
+    return full_plot_data
+
+#### use as example
 def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
     
@@ -539,14 +590,12 @@ def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filte
     for process, tasks in grouped_traces.items():
         percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
 
-        # Calculate quartiles and other boxplot values using numpy
         q1 = np.percentile(percentage_values, 25)
         median = np.percentile(percentage_values, 50)
         q3 = np.percentile(percentage_values, 75)
         min_val = np.min(percentage_values)
         max_val = np.max(percentage_values)
 
-        # Store the calculated values for the group
         process_boxplot_values[process] = {
             'min': min_val,
             'q1': q1,
@@ -554,8 +603,32 @@ def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filte
             'q3': q3,
             'max': max_val,
         }
-    return list(grouped_traces.keys()), process_boxplot_values, 
 
+    return list(grouped_traces.keys()), process_boxplot_values
+
+def get_filtered_cpu_allocation_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+
+    grouped_traces = helpers.group_by_process(traces)
+    process_boxplot_values = {}
+    
+    for process, tasks in grouped_traces.items():
+        allocation_values = [task.cpu_percentage / task.cpus for task in tasks if task.cpu_percentage and task.cpus]
+        
+        q1 = np.percentile(allocation_values, 25)
+        median = np.percentile(allocation_values, 50)
+        q3 = np.percentile(allocation_values, 75)
+        min_val = np.min(allocation_values)
+        max_val = np.max(allocation_values)
+
+        process_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+    return list(grouped_traces.keys()), process_boxplot_values
 
 """
 
