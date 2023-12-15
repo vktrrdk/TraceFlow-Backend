@@ -303,6 +303,35 @@ async def test_redis(json_b: dict):
     
 """
 
+
+"""
+
+ TODO: this should be an own function
+ if not token_id:
+        return ORJSONResponse({"error": "No token provided"}, status_code=400)
+    token = crud.get_token(db, token_id)
+    if not token:
+        return ORJSONResponse({"error": "No such token"}, status_code=404)
+"""
+
+@app.get("/run/table/{token_id}")
+async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse, page=1, rows=10, sortField="task_id", sortOrder=1):
+    if not token_id:
+        return ORJSONResponse({"error": "No token provided"}, status_code=400)
+    token = crud.get_token(db, token_id)
+    
+    if not token:
+        return ORJSONResponse({"error": "No such token"}, status_code=404)
+    run_name = json.loads(runName)
+    page = json.loads(page)
+    rows = json.loads(rows)
+    sort_field = json.loads(sortField)
+    sort_order = json.loads(sortOrder)
+
+    paginated_table = crud.get_paginated_table(db, token_id, run_name, page, rows, sort_field, sort_order)
+
+    return ORJSONResponse(content=jsonable_encoder(paginated_table), status_code=200)
+
 @app.get("/run/ram_plot/{token_id}")
 async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db: Session = Depends(get_db), response_class=ORJSONResponse):
     if not token_id:
@@ -314,7 +343,8 @@ async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db
     process_filter = json.loads(processFilter)
     tag_filter = json.loads(tagFilter)
     run_name = json.loads(runName)
-    filtered_ram_plot_results = crud.get_filtered_ram_plot_results(db, token_id, run_name,process_filter, tag_filter)
+
+    filtered_ram_plot_results = crud.get_filtered_ram_plot_results(db, token_id, run_name, process_filter, tag_filter)
     
     return ORJSONResponse(content=jsonable_encoder(filtered_ram_plot_results), status_code=200)
     

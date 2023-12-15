@@ -6,7 +6,7 @@ from fastapi import Depends
 from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, desc
 import string, random
 import models, schemas, helpers
 import logging
@@ -460,6 +460,18 @@ def get_trace_data(json_obj, token_id):
     return {}
     # adjust this functions in the near future because there certainly is a more pythonic way to do this...
 
+def get_paginated_table(db: Session, token_id: str, run_name, page, rows, sort_field, sort_order):
+    # will need further adjustments!
+    offset = page * rows
+    if sort_field is None or sort_field == "null" or sort_field == "":
+        sort_field = "task_id"
+    print(sort_order)
+    sort_method = sort_field if sort_order == 1 or sort_order is None or sort_order is "null" else desc(sort_field) 
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).order_by(sort_method).offset(offset).limit(10).all()
+    return traces
+
+
+
 def check_for_workflow_completed(db: Session, json_ob: object, token_id: string):
     metas = get_meta_by_token(db, token_id)
     run_id = json_ob["runId"];
@@ -542,7 +554,7 @@ def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filte
             'q3': q3,
             'max': max_val,
         }
-    return [list(grouped_traces.keys()), process_boxplot_values], 
+    return list(grouped_traces.keys()), process_boxplot_values, 
 
 
 """
@@ -654,7 +666,7 @@ async def persist_singleton_trace_data(async_session, trace_object: models.RunTr
         
         task_trace_object = result_traces.first()
         if task_trace_object:
-            # this needs to be adjust! seems like some adds are still slipping through - e.g when during retrieval of the object there is a an update -->
+            # this needs to be adjusted! seems like some adds are still slipping through - e.g when during retrieval of the object there is a an update -->
             # check for race condition fix
             task_trace_object = task_trace_object[0]
             if helpers.has_newer_state(task_trace_object, trace_object):
@@ -665,6 +677,8 @@ async def persist_singleton_trace_data(async_session, trace_object: models.RunTr
         await async_session.commit()
 
         
+
+
 
 
 
