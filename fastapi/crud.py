@@ -540,6 +540,11 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
     grouped_traces = helpers.group_by_process(traces)
     relative_ram_boxplot_values = {}
     cpu_allocation_boxplot_values = {}
+    cpu_used_boxplot_values = {}
+    io_read_boxplot_values = {}
+    io_written_boxplot_values = {}
+    
+    
 
     for process, tasks in grouped_traces.items():
         percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
@@ -573,10 +578,63 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             'q3': q3,
             'max': max_val,
         }
+
+        cpu_raw_used_values = [task.cpu_percentage for task in tasks if task.cpu_percentage]
+        q1 = np.percentile(cpu_raw_used_values, 25)
+        median = np.percentile(cpu_raw_used_values, 50)
+        q3 = np.percentile(cpu_raw_used_values, 75)
+        min_val = np.min(cpu_raw_used_values)
+        max_val = np.max(cpu_raw_used_values)
+
+        cpu_used_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+
+        io_read_data_values = [np.int64(task.read_bytes) / (2**30) for task in tasks if task.read_bytes]
+        
+        q1 = np.percentile(io_read_data_values, 25)
+        median = np.percentile(io_read_data_values, 50)
+        q3 = np.percentile(io_read_data_values, 75)
+        min_val = np.min(io_read_data_values)
+        max_val = np.max(io_read_data_values)
+
+        io_read_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+        
+        io_write_data_values = [np.int64(task.write_bytes) / (2**30) for task in tasks if task.write_bytes]
+        
+        q1 = np.percentile(io_write_data_values, 25)
+        median = np.percentile(io_write_data_values, 50)
+        q3 = np.percentile(io_write_data_values, 75)
+        min_val = np.min(io_write_data_values)
+        max_val = np.max(io_write_data_values)
+
+        io_written_boxplot_values[process] = {
+            'min': min_val,
+            'q1': q1,
+            'median': median,
+            'q3': q3,
+            'max': max_val,
+        }
+
+
+        # check how to handle the errors line 615 --> are there NAN values? or what?
     
+    cpu_usage_data = [cpu_allocation_boxplot_values, cpu_used_boxplot_values]
+    io_data = [io_read_boxplot_values, io_written_boxplot_values]
     full_plot_data = {
         "relative_ram": [list(grouped_traces.keys()), relative_ram_boxplot_values],
-        "cpu_allocation": [list(grouped_traces.keys()), cpu_allocation_boxplot_values]
+        "cpu": [list(grouped_traces.keys()), cpu_usage_data],
+        "io": [list(grouped_traces.keys()), io_data],
     }
 
     return full_plot_data
