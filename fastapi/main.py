@@ -307,18 +307,17 @@ async def test_redis(json_b: dict):
 
 
 @app.get("/run/table/{token_id}")
-async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse, page=1, rows=10, sortField="task_id", sortOrder=1):
+async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse, page=0, rows=10, sortField="task_id", sortOrder=1):
     token = await check_token_request(token_id, db)
     if not isinstance(token, models.RunToken):
         return token
     
-    run_name = json.loads(runName)
-    page = json.loads(page)
-    rows = json.loads(rows)
-    sort_field = json.loads(sortField)
-    sort_order = json.loads(sortOrder)
+    try:
+        sort_order = int(sortOrder)
+    except ValueError as ve:
+        sort_order = 0
 
-    paginated_table = crud.get_paginated_table(db, token_id, run_name, page, rows, sort_field, sort_order)
+    paginated_table = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order)
 
     return ORJSONResponse(content=jsonable_encoder(paginated_table), status_code=200)
 
