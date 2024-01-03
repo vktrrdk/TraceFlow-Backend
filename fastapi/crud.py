@@ -549,85 +549,107 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
     for process, tasks in grouped_traces.items():
         percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
 
-        q1 = np.percentile(percentage_values, 25)
-        median = np.percentile(percentage_values, 50)
-        q3 = np.percentile(percentage_values, 75)
-        min_val = np.min(percentage_values)
-        max_val = np.max(percentage_values)
+        try:
+            q1 = np.percentile(percentage_values, 25)
+            median = np.percentile(percentage_values, 50)
+            q3 = np.percentile(percentage_values, 75)
+            min_val = np.min(percentage_values)
+            max_val = np.max(percentage_values)
+        
+            relative_ram_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
 
-        relative_ram_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing memory percentage values")
+            relative_ram_boxplot_values[process] = {}
 
         allocation_values = [task.cpu_percentage / task.cpus for task in tasks if task.cpu_percentage and task.cpus]
         
-        q1 = np.percentile(allocation_values, 25)
-        median = np.percentile(allocation_values, 50)
-        q3 = np.percentile(allocation_values, 75)
-        min_val = np.min(allocation_values)
-        max_val = np.max(allocation_values)
+        try:
+            q1 = np.percentile(allocation_values, 25)
+            median = np.percentile(allocation_values, 50)
+            q3 = np.percentile(allocation_values, 75)
+            min_val = np.min(allocation_values)
+            max_val = np.max(allocation_values)
 
-        cpu_allocation_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
+            cpu_allocation_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing cpu allocation values")
+            cpu_allocation_boxplot_values[process] = {}
 
-        cpu_raw_used_values = [task.cpu_percentage for task in tasks if task.cpu_percentage]
-        q1 = np.percentile(cpu_raw_used_values, 25)
-        median = np.percentile(cpu_raw_used_values, 50)
-        q3 = np.percentile(cpu_raw_used_values, 75)
-        min_val = np.min(cpu_raw_used_values)
-        max_val = np.max(cpu_raw_used_values)
+        try:
+            cpu_raw_used_values = [task.cpu_percentage for task in tasks if task.cpu_percentage]
+            q1 = np.percentile(cpu_raw_used_values, 25)
+            median = np.percentile(cpu_raw_used_values, 50)
+            q3 = np.percentile(cpu_raw_used_values, 75)
+            min_val = np.min(cpu_raw_used_values)
+            max_val = np.max(cpu_raw_used_values)
 
-        cpu_used_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
+            cpu_used_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing raw cpu usage values")
+            cpu_used_boxplot_values[process] = {}
 
         io_read_data_values = [np.int64(task.read_bytes) / (2**30) for task in tasks if task.read_bytes]
         
-        q1 = np.percentile(io_read_data_values, 25)
-        median = np.percentile(io_read_data_values, 50)
-        q3 = np.percentile(io_read_data_values, 75)
-        min_val = np.min(io_read_data_values)
-        max_val = np.max(io_read_data_values)
+        
+        try:
+            q1 = np.percentile(io_read_data_values, 25)
+            median = np.percentile(io_read_data_values, 50)
+            q3 = np.percentile(io_read_data_values, 75)
+            min_val = np.min(io_read_data_values)
+            max_val = np.max(io_read_data_values)
 
-        io_read_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
+            io_read_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing i/o read values")
+            io_read_boxplot_values[process] = {}
         
         io_write_data_values = [np.int64(task.write_bytes) / (2**30) for task in tasks if task.write_bytes]
         
-        q1 = np.percentile(io_write_data_values, 25)
-        median = np.percentile(io_write_data_values, 50)
-        q3 = np.percentile(io_write_data_values, 75)
-        min_val = np.min(io_write_data_values)
-        max_val = np.max(io_write_data_values)
+        try:
+            q1 = np.percentile(io_write_data_values, 25)
+            median = np.percentile(io_write_data_values, 50)
+            q3 = np.percentile(io_write_data_values, 75)
+            min_val = np.min(io_write_data_values)
+            max_val = np.max(io_write_data_values)
 
-        io_written_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
+            io_written_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing i/o write values")
+            io_written_boxplot_values[process] = {}
 
-
-        # check how to handle the errors line 615 --> are there NAN values? or what?
     
     cpu_usage_data = [cpu_allocation_boxplot_values, cpu_used_boxplot_values]
     io_data = [io_read_boxplot_values, io_written_boxplot_values]
