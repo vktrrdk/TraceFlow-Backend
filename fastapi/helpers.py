@@ -733,18 +733,25 @@ def get_process_tags_to_filter_by(filter_dict):
 
 def retrieve_ilike_conditionals_from_tags(tag_list):
     filter_list = []
+    if tag_list is None: 
+        return True
     for x in tag_list:
-        if '' in x:
+        print(x)
+        if x is None:
+            filter_list.append('')
+        elif '' in x:
             filter_list.append('')
         elif '_' in x:
             filter_list.append(x['_'])
         else:
+            print("this case")
             first_key = next(iter(x))
-            filter_list.append(f"{first_key}:{first_key[x]}")
+            filter_list.append(f"{first_key}:{x[first_key]}")
+
     
-    if filter_list == []:
+    if len(filter_list) == 0: 
         return True
-    
+
     ilike_conditions = [func.replace(models.RunTrace.tag, ' ', '').ilike(func.replace(filter_string, ' ', '')) for filter_string in filter_list]
     print(ilike_conditions)
     return or_(*ilike_conditions)
