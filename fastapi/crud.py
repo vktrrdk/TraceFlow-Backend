@@ -6,7 +6,7 @@ from fastapi import Depends
 from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine, select, desc, text
+from sqlalchemy import create_engine, select, desc, text, or_
 import string, random
 import models, schemas, helpers
 import logging
@@ -460,15 +460,28 @@ def get_trace_data(json_obj, token_id):
     return {}
     # adjust this functions in the near future because there certainly is a more pythonic way to do this...
 
-def get_paginated_table(db: Session, token_id: str, run_name: str, page, rows, sort_field, sort_order):
+def get_paginated_table(db: Session, token_id: str, run_name: str, page, rows, sort_field, sort_order, filters):
     # will need further adjustments!
     offset = page * rows
-    print(offset)
+    process_name_to_filter_by = helpers.get_process_name_to_filter_by(filters)
+    full_name_to_filter_by = helpers.get_full_name_to_filter_by(filters)
+    process_tags_filter_query = helpers.get_process_tags_to_filter_by(filters) ## 
+    process_statuses_to_filter_by = helpers.get_process_statuses_to_filter_by(filters)
     if sort_field is None or sort_field == "null" or sort_field == "":
         sort_field = 'task_id'
     sort_method = text(sort_field) if sort_order == 1 or sort_order is None or sort_order == "null" else desc(text(sort_field)) 
-    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).order_by(sort_method).offset(offset).limit(rows).all()
-    print(f"token: {token_id}, runName: {run_name}, sort: {sort_method}")
+    traces = (
+        db.query(models.RunTrace)
+        .filter(
+            models.RunTrace.token == token_id, 
+            models.RunTrace.run_name == run_name, 
+            models.RunTrace.process.contains(process_name_to_filter_by),
+            models.RunTrace.name.contains(full_name_to_filter_by),
+            or_(models.RunTrace.status.in_(process_statuses_to_filter_by), process_statuses_to_filter_by == []),
+            process_tags_filter_query,
+            )
+        .order_by(sort_method).offset(offset).limit(rows).all()
+    )
     
     return traces
 

@@ -6,6 +6,7 @@ from itertools import groupby
 from operator import attrgetter
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, true, false
 import string, random
 import models, schemas, crud
 
@@ -660,3 +661,93 @@ def group_by_process(traces):
 """
 End of analysis part
 """
+
+"""Filtering helpers"""
+
+
+def get_process_name_to_filter_by(filter_dict):
+    try:
+        if 'process' in filter_dict:
+            process_property = filter_dict['process']
+            if 'value' in process_property:
+                value = process_property['value']
+                if value is None:
+                    return ""
+                return value.strip()
+    except TypeError:
+        return ""
+    return ""
+
+
+def get_full_name_to_filter_by(filter_dict):
+    try:
+        if 'name' in filter_dict:
+            name_property = filter_dict['name']
+            if 'value' in name_property:
+                value = name_property['value']
+                if value is None:
+                    return ""
+                return value.strip()
+    except TypeError:
+        return ""
+    return ""
+
+
+def get_process_statuses_to_filter_by(filter_dict):
+    try:
+        if 'status' in filter_dict:
+            status_property = filter_dict['status']
+            if 'value' in status_property:
+                value = status_property['value']
+                if value is None or value == "":
+                    return []
+                return value
+    except TypeError:
+        return []
+    return []
+
+""" dict:
+
+{
+    'status': {'value': ['RUNNING', 'COMPLETED'], 'matchMode': 'in'}, 
+    'name': {'value': None, 'matchMode': 'contains'}, 
+    'process': {'value': 'ram_test', 'matchMode': 'contains'}, 
+    'tag': {'value': [{'': None}, {'try': '3'}, {'6': 'test'}, {'_': '16'}], 'matchMode': 'tagTableFilter'}}
+}
+"""
+
+def get_process_tags_to_filter_by(filter_dict):
+    try:
+        if 'tag' in filter_dict:
+            tag_property = filter_dict['tag']
+            if 'value' in tag_property:
+                value = tag_property['value']
+                if value is None or value == "" or value == []:
+                    return True
+                else: 
+                    return retrieve_ilike_conditionals_from_tags(value)
+    except TypeError:
+        return True
+    return True
+
+
+def retrieve_ilike_conditionals_from_tags(tag_list):
+    filter_list = []
+    for x in tag_list:
+        if '' in x:
+            filter_list.append('')
+        elif '_' in x:
+            filter_list.append(x['_'])
+        else:
+            first_key = next(iter(x))
+            filter_list.append(f"{first_key}:{first_key[x]}")
+    
+    if filter_list == []:
+        return True
+    
+    ilike_conditions = [func.replace(models.RunTrace.tag, ' ', '').ilike(func.replace(filter_string, ' ', '')) for filter_string in filter_list]
+    print(ilike_conditions)
+    return or_(*ilike_conditions)
+
+"""End of filtering helpers"""
+

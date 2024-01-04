@@ -262,6 +262,7 @@ async def persist_run_for_token(token_id: str, json_ob: dict, db: Session = Depe
     :param db: The database to persist the information in
     :return: Response state
     # # # TODO: adjust checking to be part of the persistence function --> give it to the worker instead of doing it with main component
+    # # # TODO: also check as the persistance of certain objects still leads to tasks to be saved multiple times (with different states)
     """
     if not token_id:
         return Response(status_code=404)
@@ -307,7 +308,20 @@ async def test_redis(json_b: dict):
 
 
 @app.get("/run/table/{token_id}")
-async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse, page=0, rows=10, sortField="task_id", sortOrder=1):
+async def get_table_data(
+    runName, 
+    token_id: str, 
+    db: Session = Depends(get_db), 
+    response_class=ORJSONResponse, 
+    page=0, 
+    rows=10, 
+    sortField="task_id", 
+    sortOrder=1,
+    filters=None,
+):
+    
+    if filters:
+        filters = json.loads(filters)
     token = await check_token_request(token_id, db)
     if not isinstance(token, models.RunToken):
         return token
@@ -317,7 +331,7 @@ async def get_table_data(runName, token_id: str, db: Session = Depends(get_db), 
     except ValueError as ve:
         sort_order = 0
 
-    paginated_table = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order)
+    paginated_table = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order, filters)
 
     return ORJSONResponse(content=jsonable_encoder(paginated_table), status_code=200)
 
