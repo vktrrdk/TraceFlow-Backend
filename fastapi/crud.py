@@ -461,7 +461,8 @@ def get_trace_data(json_obj, token_id):
     # adjust this functions in the near future because there certainly is a more pythonic way to do this...
 
 def get_paginated_table(db: Session, token_id: str, run_name: str, page, rows, sort_field, sort_order, filters):
-    # will need further adjustments!
+    # will need further adjustments --> order function for problematic tasks --> calculation of problematic task needs data entered by user
+    # see processIsDeclaredProblematic in workflowComponent
     offset = page * rows
     print(f"offset: {offset}, page: {page}, rows: {rows}")
     process_name_to_filter_by = helpers.get_process_name_to_filter_by(filters)
@@ -545,9 +546,8 @@ def update_trace_state(trace_id: str, new_state: str):
 
 """
 PLOT DATA RETRIEVAL BELOW
-
-! -- this should be refactored, so only one request is made and all plot data is returned via this single request! would prevent multiple database queries
 FILTERING needs to be implemented!
+We also need to consider the units given (gib, mib, ..., s, m, h)
 """
 
 def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
@@ -559,7 +559,11 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
     cpu_used_boxplot_values = {}
     io_read_boxplot_values = {}
     io_written_boxplot_values = {}
-    
+    ram_requested_boxplot_values = {}
+    vmem_boxplot_values = {}
+    rss_boxplot_values = {}
+    duration_time_boxplot_values = {}
+    duration_sum_boxplot_values = {}
     
 
     for process, tasks in grouped_traces.items():
@@ -666,13 +670,76 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing i/o write values")
             io_written_boxplot_values[process] = {}
 
-    
+        requested_ram_values = [np.int64(task.memory) / (2**30) for task in tasks if task.memory]
+        vmem_ram_values = [np.int64(task.vmem) / (2**30) for task in tasks if task.vmem]
+        rss_ram_values = [np.int64(task.rss) / (2**30) for task in tasks if task.rss]
+        try:
+            q1 = np.percentile(vmem_ram_values, 25)
+            median = np.percentile(vmem_ram_values, 50)
+            q3 = np.percentile(vmem_ram_values, 75)
+            min_val = np.min(vmem_ram_values)
+            max_val = np.max(vmem_ram_values)
+
+            vmem_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing virtual memory values")
+            vmem_boxplot_values[process] = {}
+        
+        try:
+            q1 = np.percentile(requested_ram_values, 25)
+            median = np.percentile(requested_ram_values, 50)
+            q3 = np.percentile(requested_ram_values, 75)
+            min_val = np.min(requested_ram_values)
+            max_val = np.max(requested_ram_values)
+
+            ram_requested_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing requested memory values")
+            ram_requested_boxplot_values[process] = {}
+        
+        try:
+            q1 = np.percentile(rss_ram_values, 25)
+            median = np.percentile(rss_ram_values, 50)
+            q3 = np.percentile(rss_ram_values, 75)
+            min_val = np.min(rss_ram_values)
+            max_val = np.max(rss_ram_values)
+
+            rss_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing rss memory values")
+            rss_boxplot_values[process] = {}
+
+
+        # duration_single_data_values = [np.int64(task.)] go on from here and
+        # also add sum
+        # duration_sum_data_values = ... 
+
     cpu_usage_data = [cpu_allocation_boxplot_values, cpu_used_boxplot_values]
     io_data = [io_read_boxplot_values, io_written_boxplot_values]
+    ram_data = [ram_requested_boxplot_values, vmem_boxplot_values, rss_boxplot_values]
     full_plot_data = {
         "relative_ram": [list(grouped_traces.keys()), relative_ram_boxplot_values],
         "cpu": [list(grouped_traces.keys()), cpu_usage_data],
         "io": [list(grouped_traces.keys()), io_data],
+        "ram": [list(grouped_traces.keys()), ram_data]
     }
 
     return full_plot_data
