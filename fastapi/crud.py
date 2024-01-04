@@ -463,6 +463,7 @@ def get_trace_data(json_obj, token_id):
 def get_paginated_table(db: Session, token_id: str, run_name: str, page, rows, sort_field, sort_order, filters):
     # will need further adjustments!
     offset = page * rows
+    print(f"offset: {offset}, page: {page}, rows: {rows}")
     process_name_to_filter_by = helpers.get_process_name_to_filter_by(filters)
     full_name_to_filter_by = helpers.get_full_name_to_filter_by(filters)
     process_tags_filter_query = helpers.get_process_tags_to_filter_by(filters) ## 
@@ -480,10 +481,10 @@ def get_paginated_table(db: Session, token_id: str, run_name: str, page, rows, s
             or_(models.RunTrace.status.in_(process_statuses_to_filter_by), process_statuses_to_filter_by == []),
             process_tags_filter_query,
             )
-        .order_by(sort_method).offset(offset).limit(rows).all()
     )
-    
-    return traces
+
+    number_of_matching_entries = len(traces.all())
+    return traces.order_by(sort_method).offset(offset).limit(rows).all(), number_of_matching_entries
 
 
 

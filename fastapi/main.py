@@ -331,9 +331,9 @@ async def get_table_data(
     except ValueError as ve:
         sort_order = 0
 
-    paginated_table = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order, filters)
-
-    return ORJSONResponse(content=jsonable_encoder(paginated_table), status_code=200)
+    paginated_table, number_available = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order, filters)
+    
+    return ORJSONResponse(content=jsonable_encoder({'table_page': paginated_table, 'number_available': number_available}), status_code=200)
 
 @app.get("/run/ram_plot/{token_id}")
 async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db: Session = Depends(get_db), response_class=ORJSONResponse):
