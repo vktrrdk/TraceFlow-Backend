@@ -30,6 +30,9 @@ tag_memory_rss_average_ratio_threshold = 1.4  # 140% memory in relation to other
 top_percent_ratio = 0.1  # 10 percent. could be set as env variable !
 limit_processes_per_domain_by_number = 10  # if 10% s more than this number, limit it
 
+DEFAULT_MEMORY_FORMAT = "GiB"
+DEFAULT_DURATION_FORMAT = "h"
+
 def get_relevant_information_per_task(task):
     task_dict = task.__dict__
     relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'vmem', 'realtime', 'cpu_percentage', 'rss', 'status']
@@ -757,4 +760,31 @@ def retrieve_ilike_conditionals_from_tags(tag_list):
     return or_(*ilike_conditions)
 
 """End of filtering helpers"""
+
+"""Conversion helpers"""
+# Memory values persisted in bytes
+def convert_to_memory_format(memory_format, value):
+    match memory_format:
+        case 'MiB':
+            return value / (2**20)
+        case 'kiB':
+            return value / 1024
+        case 'b':
+            return value 
+        case _:
+            return value / (2**30)
+            
+
+# time values persisted in ms
+def convert_to_time_format(time_format, value):
+    match time_format:
+        case 'min':
+            return value / (1000 * 60)
+        case 's':
+            return value / 1000
+        case _:
+            return value / (1000 * 60 * 60)
+    
+
+"""End of conversion helpers"""
 

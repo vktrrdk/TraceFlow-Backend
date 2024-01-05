@@ -550,7 +550,7 @@ FILTERING needs to be implemented!
 We also need to consider the units given (gib, mib, ..., s, m, h)
 """
 
-def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
+def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter, memory_format, duration_format):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
     
     grouped_traces = helpers.group_by_process(traces)
@@ -629,8 +629,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing raw cpu usage values")
             cpu_used_boxplot_values[process] = {}
 
-        io_read_data_values = [np.int64(task.read_bytes) / (2**30) for task in tasks if task.read_bytes]
-        
+        io_read_data_values = [helpers.convert_to_memory_format(memory_format=memory_format, value=np.int64(task.read_bytes)) for task in tasks if task.read_bytes]
         
         try:
             q1 = np.percentile(io_read_data_values, 25)
@@ -650,7 +649,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing i/o read values")
             io_read_boxplot_values[process] = {}
         
-        io_write_data_values = [np.int64(task.write_bytes) / (2**30) for task in tasks if task.write_bytes]
+        io_write_data_values = [helpers.convert_to_memory_format(memory_format=memory_format, value=np.int64(task.write_bytes)) for task in tasks if task.write_bytes]
         
         try:
             q1 = np.percentile(io_write_data_values, 25)
@@ -670,9 +669,10 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing i/o write values")
             io_written_boxplot_values[process] = {}
 
-        requested_ram_values = [np.int64(task.memory) / (2**30) for task in tasks if task.memory]
-        vmem_ram_values = [np.int64(task.vmem) / (2**30) for task in tasks if task.vmem]
-        rss_ram_values = [np.int64(task.rss) / (2**30) for task in tasks if task.rss]
+        requested_ram_values = [helpers.convert_to_memory_format(memory_format=memory_format, value=np.int64(task.memory)) for task in tasks if task.memory]
+        vmem_ram_values = [helpers.convert_to_memory_format(memory_format=memory_format, value=np.int64(task.vmem)) for task in tasks if task.vmem]
+        rss_ram_values = [helpers.convert_to_memory_format(memory_format=memory_format, value=np.int64(task.rss)) for task in tasks if task.rss]
+        
         try:
             q1 = np.percentile(vmem_ram_values, 25)
             median = np.percentile(vmem_ram_values, 50)
@@ -729,7 +729,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
 
 
         
-        single_realtime_values = [np.int64(task.realtime)  / 1000 for task in tasks if task.realtime]
+        single_realtime_values = [helpers.convert_to_time_format(time_format=duration_format, value=np.int64(task.realtime)) for task in tasks if task.realtime]
         summarized_realtime_values = sum(single_realtime_values)
 
     
@@ -767,9 +767,9 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
         "duration": [list(grouped_traces.keys()), duration_data] 
     }
 
-
-
     return full_plot_data
+
+    ### TODO: Numpy int64 values lead to errors on json-encoding - for values like bytes and/or other small units this may lead to problems! --> needs to be adjusted
 
 #### use as example
 def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
@@ -819,55 +819,6 @@ def get_filtered_cpu_allocation_plot_results(db: Session, token_id, run_name, pr
             'max': max_val,
         }
     return list(grouped_traces.keys()), process_boxplot_values
-
-"""
-
-FURTHER TODO: add the labels to the response 
-
-example data for precalculated boxplots:
-
-const data: ChartConfiguration<'boxplot'>['data'] = {
-  labels: ['array', '{boxplot values}', 'with items', 'as outliers'],
-  datasets: [
-    {
-      label: 'Dataset 1',
-      borderWidth: 1,
-      itemRadius: 2,
-      itemStyle: 'circle',
-      itemBackgroundColor: '#000',
-      outlierBackgroundColor: '#000',
-      data: [
-        [1, 2, 3, 4, 5, 11],
-        {
-          min: 1,
-          q1: 2,
-          median: 3,
-          q3: 4,
-          max: 5,
-        },
-        {
-          min: 1,
-          q1: 2,
-          median: 3,
-          q3: 4,
-          max: 5,
-          items: [1, 2, 3, 4, 5],
-        },
-        {
-          min: 1,
-          q1: 2,
-          median: 3,
-          q3: 4,
-          max: 5,
-          outliers: [11],
-        },
-      ],
-    },
-  ],
-};
-
-"""
-
     
 
 def persist_trace(json_ob, token):

@@ -366,7 +366,7 @@ async def get_cpu_allocation_plot_data(token_id: str, processFilter, tagFilter, 
 
 ### TODO: use this! implement function in crud and use response in ui
 @app.get("/run/plots/{token_id}")
-async def get_plot_data(token_id: str, processFilter, tagFilter, runName,  db: Session = Depends(get_db), response_class=ORJSONResponse):
+async def get_plot_data(token_id: str, processFilter, tagFilter, runName, memoryFormat, durationFormat, db: Session = Depends(get_db), response_class=ORJSONResponse):
     token = await check_token_request(token_id, db)
     if not isinstance(token, models.RunToken):
         return token
@@ -375,7 +375,7 @@ async def get_plot_data(token_id: str, processFilter, tagFilter, runName,  db: S
     tag_filter = json.loads(tagFilter)
     run_name = json.loads(runName)
 
-    full_plot_results = crud.get_plot_results(db, token_id, run_name, process_filter, tag_filter)
+    full_plot_results = crud.get_plot_results(db, token_id, run_name, process_filter, tag_filter, memoryFormat, durationFormat)
     
     return ORJSONResponse(content=jsonable_encoder(full_plot_results), status_code=200)
 
