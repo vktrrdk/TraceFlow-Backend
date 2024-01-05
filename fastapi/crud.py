@@ -563,7 +563,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
     vmem_boxplot_values = {}
     rss_boxplot_values = {}
     duration_time_boxplot_values = {}
-    duration_sum_boxplot_values = {}
+    duration_sum_bar_values = {}
     
 
     for process, tasks in grouped_traces.items():
@@ -728,19 +728,46 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             rss_boxplot_values[process] = {}
 
 
-        # duration_single_data_values = [np.int64(task.)] go on from here and
-        # also add sum
-        # duration_sum_data_values = ... 
+        
+        single_realtime_values = [np.int64(task.realtime)  / 1000 for task in tasks if task.realtime]
+        summarized_realtime_values = sum(single_realtime_values)
 
+    
+
+        try: 
+            q1 = np.percentile(single_realtime_values, 25)
+            median = np.percentile(single_realtime_values, 50)
+            q3 = np.percentile(single_realtime_values, 75)
+            min_val = np.min(single_realtime_values)
+            max_val = np.max(single_realtime_values)
+            
+            duration_time_boxplot_values[process] = {
+                'min': min_val,
+                'q1': q1,
+                'median': median,
+                'q3': q3,
+                'max': max_val,
+            }
+            duration_sum_bar_values[process] = summarized_realtime_values
+
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing time values")
+            duration_time_boxplot_values[process] = {}
+            duration_sum_bar_values[process] = 0
+            
     cpu_usage_data = [cpu_allocation_boxplot_values, cpu_used_boxplot_values]
     io_data = [io_read_boxplot_values, io_written_boxplot_values]
     ram_data = [ram_requested_boxplot_values, vmem_boxplot_values, rss_boxplot_values]
+    duration_data = [duration_time_boxplot_values, duration_sum_bar_values]
     full_plot_data = {
         "relative_ram": [list(grouped_traces.keys()), relative_ram_boxplot_values],
         "cpu": [list(grouped_traces.keys()), cpu_usage_data],
         "io": [list(grouped_traces.keys()), io_data],
-        "ram": [list(grouped_traces.keys()), ram_data]
+        "ram": [list(grouped_traces.keys()), ram_data],
+        "duration": [list(grouped_traces.keys()), duration_data] 
     }
+
+
 
     return full_plot_data
 
