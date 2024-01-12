@@ -33,6 +33,30 @@ limit_processes_per_domain_by_number = 10  # if 10% s more than this number, lim
 DEFAULT_MEMORY_FORMAT = "GiB"
 DEFAULT_DURATION_FORMAT = "h"
 
+
+def get_progress_values_for_trace_list(traces):
+    sorted_traces = sorted(traces, key=lambda x: x.status)
+    task_lists_grouped_by_status = {key: list(group) for key, group in groupby(sorted_traces, key=lambda x: x.status)}
+    progress_values = {
+        "all": len(traces),
+        "submitted": len(task_lists_grouped_by_status.get('SUBMITTED', [])),
+        "running": len(task_lists_grouped_by_status.get('RUNNING', [])),
+        "failed": len(task_lists_grouped_by_status.get('FAILED', [])),
+        "aborted": len(task_lists_grouped_by_status.get('ABORTED', [])),
+        "completed": len(task_lists_grouped_by_status.get('COMPLETED', [])),
+        "cached": len(task_lists_grouped_by_status.get('CACHED', [])),
+        "pending": len(task_lists_grouped_by_status.get('PENDING', [])),
+    }
+    return progress_values
+
+## TODO: we want to get all processes, including the number of tasks running per process and which tasks?
+## all in one list or separate?
+def get_processes_for_trace_list(traces):
+    sorted_traces = sorted(traces, key=lambda x: x.process)
+    processes = sorted_traces.keys()
+    return processes
+
+
 def get_relevant_information_per_task(task):
     task_dict = task.__dict__
     relevant_keys = ['task_id', 'process', 'run_name', 'cpus', 'tag', 'memory', 'duration', 'vmem', 'realtime', 'cpu_percentage', 'rss', 'status']

@@ -387,11 +387,36 @@ async def check_token_request(token_id, db: Session):
         return ORJSONResponse({"error": "No such token"}, status_code=404)
     return token
 
+@app.get("/run/progress/{token_id}")
+async def get_progress(token_id: str, runName: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+    
+    progress = crud.get_progress_for_token_and_run(db, token_id, runName)
+
+    return ORJSONResponse(content=jsonable_encoder(progress), status_code=200)
+    
+
+
+@app.get("/run/processes/{token_id}")
+async def get_processes(token_id: str, runName: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+    
+    processes = crud.get_processes_for_token_and_run(db, token_id, runName)
+    return ORJSONResponse(content=jsonable_encoder(processes, status_code=200))
 
 @app.get("/run/info/{token_id}/")
 async def get_run_information(token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
     """
     Returns all information persisted for a certain token.
+    TODO: Refactor: Do not deliver information twice.
+    #
+    Split up the information, as the table holds everything. 
+    Webapp-wise there is to much dependency on the "result_by_run_name" - key
+    #
     :param token_id: The id of the run-token
     :param threshold_params: the threshold parameters
     :param db:

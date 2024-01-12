@@ -544,6 +544,18 @@ def update_trace_state(trace_id: str, new_state: str):
 
 """    
 
+def get_progress_for_token_and_run(db: Session, token_id, run_name):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    progress_values = helpers.get_progress_values_for_trace_list(traces) 
+
+    return progress_values
+
+
+
+def get_processes_for_token_and_run(db: Session, token_id, run_name):
+    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    
+
 """
 PLOT DATA RETRIEVAL BELOW
 FILTERING needs to be implemented!
