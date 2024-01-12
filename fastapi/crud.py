@@ -554,7 +554,15 @@ def get_progress_for_token_and_run(db: Session, token_id, run_name):
 
 def get_processes_for_token_and_run(db: Session, token_id, run_name):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    process_values = helpers.get_processes_for_trace_list(traces)
+
+
+    processes_to_return = {}
     
+    for process_value in process_values:
+        processes_to_return[process_value] = [{"tags": trace.tag, "attempt": trace.attempt, "task_id": trace.task_id} for trace in traces if trace.status == "RUNNING" and trace.process == process_value] 
+
+    return processes_to_return
 
 """
 PLOT DATA RETRIEVAL BELOW

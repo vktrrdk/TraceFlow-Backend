@@ -53,8 +53,8 @@ def get_progress_values_for_trace_list(traces):
 ## all in one list or separate?
 def get_processes_for_trace_list(traces):
     sorted_traces = sorted(traces, key=lambda x: x.process)
-    processes = sorted_traces.keys()
-    return processes
+    processes = {key: list(group) for key, group in groupby(sorted_traces, key=lambda x: x.process)}
+    return list(processes.keys())
 
 
 def get_relevant_information_per_task(task):

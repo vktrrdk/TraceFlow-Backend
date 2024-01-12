@@ -406,7 +406,7 @@ async def get_processes(token_id: str, runName: str, db: Session = Depends(get_d
         return token
     
     processes = crud.get_processes_for_token_and_run(db, token_id, runName)
-    return ORJSONResponse(content=jsonable_encoder(processes, status_code=200))
+    return ORJSONResponse(content=jsonable_encoder(processes) , status_code=200)
 
 @app.get("/run/info/{token_id}/")
 async def get_run_information(token_id: str, db: Session = Depends(get_db), response_class=ORJSONResponse):
