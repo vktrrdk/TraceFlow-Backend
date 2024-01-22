@@ -377,10 +377,6 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
         per_process_memory_allocation = []
         per_process_rss_ratio = []
 
-        # ratio plot
-        ram_cpu_relation_labels = distinct_process_names
-        ram_cpu_relation_data = []
-
         for process_name in distinct_process_names:
             by_process_tasks = [task for task in run_task_information if task['process'] == process_name]
             per_process_realtime_list = [task['realtime'] for task in by_process_tasks if task['realtime'] is not None]
@@ -397,19 +393,6 @@ def analyze(db: Session, grouped_processes, threshold_numbers):
 
             memory_physical_ratio_results = get_per_process_worst_rss_ratios(process_name, by_process_tasks)
             per_process_rss_ratio.append(memory_physical_ratio_results)
-
-            process_relation_data = get_process_relation_data(by_process_tasks)
-            ram_cpu_relation_data.append(process_relation_data)
-
-            final_error_bar_data = {
-                "data": ram_cpu_relation_data,
-                "label": "CPU - RAM ratio"
-            }
-
-            per_run_cpu_ram_ratio_data[run_name] = {
-                "data": final_error_bar_data,
-                "labels": ram_cpu_relation_labels,
-            }
 
     
         per_run_bad_duration_processes_sums[run_name] = sorted(per_process_duration_sum, key=lambda process: process.get('sum'), reverse=True)[:return_number_processes]

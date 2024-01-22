@@ -584,7 +584,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
     rss_boxplot_values = {}
     duration_time_boxplot_values = {}
     duration_sum_bar_values = {}
-    
+    ram_ratio_plot_values = {}
 
     for process, tasks in grouped_traces.items():
         percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
@@ -629,8 +629,10 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing cpu allocation values")
             cpu_allocation_boxplot_values[process] = {}
 
+        cpu_raw_used_values = [task.cpu_percentage for task in tasks if task.cpu_percentage]
+
         try:
-            cpu_raw_used_values = [task.cpu_percentage for task in tasks if task.cpu_percentage]
+            
             q1 = np.percentile(cpu_raw_used_values, 25)
             median = np.percentile(cpu_raw_used_values, 50)
             q3 = np.percentile(cpu_raw_used_values, 75)
@@ -774,17 +776,46 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             logger.info(f"IndexError - {e}\n\nDue to missing time values")
             duration_time_boxplot_values[process] = {}
             duration_sum_bar_values[process] = 0
-            
+
+        cpu_allocation_values = [task.cpu_percentage / task.cpus for task in tasks if task.cpu_percentage and task.cpus and task.rss and task.memory]
+        memory_allocation_values = [(task.rss / task.memory) * 100 for task in tasks if task.cpu_percentage and task.cpus and task.rss and task.memory]
+
+        try:
+            x_min = np.min(cpu_allocation_values)
+            x_max = np.max(cpu_allocation_values)
+            x_mean = np.mean(cpu_allocation_values)
+            y_min = np.min(memory_allocation_values)
+            y_max = np.max(memory_allocation_values)
+            y_mean = np.mean(memory_allocation_values)
+
+            ram_ratio_plot_values[process] = {
+                'xMin': x_min,
+                'x': x_mean,
+                'xMax': x_max,
+                'yMin': y_min,
+                'y': y_mean,
+                'yMax': y_max,
+            }
+
+        except IndexError as e:
+            logger.info(f"IndexError - {e}\n\nDue to missing cpu or memory allocation values")
+            ram_ratio_plot_values[process] = {}
+
+
+
     cpu_usage_data = [cpu_allocation_boxplot_values, cpu_used_boxplot_values]
     io_data = [io_read_boxplot_values, io_written_boxplot_values]
     ram_data = [ram_requested_boxplot_values, vmem_boxplot_values, rss_boxplot_values]
     duration_data = [duration_time_boxplot_values, duration_sum_bar_values]
+    
+    keylist = list(grouped_traces.keys())
     full_plot_data = {
-        "relative_ram": [list(grouped_traces.keys()), relative_ram_boxplot_values],
-        "cpu": [list(grouped_traces.keys()), cpu_usage_data],
-        "io": [list(grouped_traces.keys()), io_data],
-        "ram": [list(grouped_traces.keys()), ram_data],
-        "duration": [list(grouped_traces.keys()), duration_data] 
+        "relative_ram": [keylist, relative_ram_boxplot_values],
+        "cpu": [keylist, cpu_usage_data],
+        "io": [keylist, io_data],
+        "ram": [keylist, ram_data],
+        "duration": [keylist, duration_data],
+        "cpu_ram_ratio": [keylist, ram_ratio_plot_values]
     }
 
     return full_plot_data
