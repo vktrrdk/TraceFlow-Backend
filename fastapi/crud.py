@@ -7,6 +7,7 @@ from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, select, desc, text, or_
+from sqlalchemy.sql.expression import func
 import string, random
 import models, schemas, helpers
 import logging
@@ -571,7 +572,28 @@ We also need to consider the units given (gib, mib, ..., s, m, h)
 """
 
 def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter, memory_format, duration_format):
-    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
+    trace_query = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name)
+
+    if len(process_filter) > 0:
+        trace_query = trace_query.filter(models.RunTrace.process.in_(process_filter))
+    if len(tag_filter) > 0:
+        if "" in tag_filter:
+            tag_filter = [tf for tf in tag_filter if tf != ""]
+            first_query = trace_query.filter(
+                or_(*[func.replace(models.RunTrace.tag, " ", "").ilike(f'%{tag.replace(" ", "")}%') for tag in tag_filter])
+            )
+            second_query = trace_query.filter(models.RunTrace.tag.is_(None))
+            trace_query = first_query.union(second_query)
+        else:
+            trace_query = trace_query.filter(
+                or_(*[func.replace(models.RunTrace.tag, " ", "").ilike(f'%{tag.replace(" ", "")}%') for tag in tag_filter])
+            )
+    # TODO: refactor, check why this is not working as wanted. also consider having this filter applied to all crud methods when filtering
+            # is neccessary for that function, as duplication would not be nice
+            
+
+    traces = trace_query.all()
+
     
     grouped_traces = helpers.group_by_process(traces)
     relative_ram_boxplot_values = {}
@@ -588,7 +610,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
 
     for process, tasks in grouped_traces.items():
         percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
-
+        
         try:
             q1 = np.percentile(percentage_values, 25)
             median = np.percentile(percentage_values, 50)
@@ -822,55 +844,16 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
 
     ### TODO: Numpy int64 values lead to errors on json-encoding - for values like bytes and/or other small units this may lead to problems! --> needs to be adjusted
 
-#### use as example
-def get_filtered_ram_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
+def get_available_processes_and_tags(db: Session, token_id, run_name):
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
-    
-    grouped_traces = helpers.group_by_process(traces)
-    process_boxplot_values = {}
-    for process, tasks in grouped_traces.items():
-        percentage_values = [(task.rss / task.memory) * 100 for task in tasks if task.rss and task.memory]
+    temp_result_processes, temp_result_tags = [], []
+    for trace in traces:
+        temp_result_processes.append(trace.process)
+        process_tags = helpers.tags_from_process(trace)
+        temp_result_tags.extend(process_tags)
+    tag_result = helpers.get_unique_tags(temp_result_tags)
+    return {'processes': list(set(temp_result_processes)), 'tags': tag_result}
 
-        q1 = np.percentile(percentage_values, 25)
-        median = np.percentile(percentage_values, 50)
-        q3 = np.percentile(percentage_values, 75)
-        min_val = np.min(percentage_values)
-        max_val = np.max(percentage_values)
-
-        process_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
-
-    return list(grouped_traces.keys()), process_boxplot_values
-
-def get_filtered_cpu_allocation_plot_results(db: Session, token_id, run_name, process_filter, tag_filter):
-    traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
-
-    grouped_traces = helpers.group_by_process(traces)
-    process_boxplot_values = {}
-    
-    for process, tasks in grouped_traces.items():
-        allocation_values = [task.cpu_percentage / task.cpus for task in tasks if task.cpu_percentage and task.cpus]
-        
-        q1 = np.percentile(allocation_values, 25)
-        median = np.percentile(allocation_values, 50)
-        q3 = np.percentile(allocation_values, 75)
-        min_val = np.min(allocation_values)
-        max_val = np.max(allocation_values)
-
-        process_boxplot_values[process] = {
-            'min': min_val,
-            'q1': q1,
-            'median': median,
-            'q3': q3,
-            'max': max_val,
-        }
-    return list(grouped_traces.keys()), process_boxplot_values
-    
 
 def persist_trace(json_ob, token):
   

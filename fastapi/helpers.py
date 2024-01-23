@@ -552,16 +552,23 @@ def tags_from_process(process: models.RunTrace):
     tags = process.tag
     return tags_from_string(tags)
 
+def get_unique_tags(tags):
+    unique_pairs = []
+    for single_tag in tags:
+        if single_tag not in unique_pairs:
+            unique_pairs.append(single_tag)
+    return unique_pairs
+
 def tags_from_string(str: string):
     if str is None or str == '':
-        return [{'_': None}]
+        return [{'': None}]
     pairs = []
     splitted = str.split(',')
     for splitted_string in splitted:
         splitted_string = splitted_string
         pair = splitted_string.split(':')
         if len(pair) > 1:
-            pairs.append({pair[0].strip(), pair[1].strip()})
+            pairs.append({pair[0].strip(): pair[1].strip()})
         else:
             pairs.append({'_': pair[0].strip()})
     return pairs
@@ -746,7 +753,6 @@ def retrieve_ilike_conditionals_from_tags(tag_list):
     if tag_list is None: 
         return True
     for x in tag_list:
-        print(x)
         if x is None:
             filter_list.append('')
         elif '' in x:
@@ -754,7 +760,6 @@ def retrieve_ilike_conditionals_from_tags(tag_list):
         elif '_' in x:
             filter_list.append(x['_'])
         else:
-            print("this case")
             first_key = next(iter(x))
             filter_list.append(f"{first_key}:{x[first_key]}")
 

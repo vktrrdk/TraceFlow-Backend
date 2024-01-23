@@ -305,6 +305,21 @@ async def test_redis(json_b: dict):
 """
 
 
+@app.get("/run/selection/{token_id}")
+async def get_processes_and_tags(
+    runName,
+    token_id,
+    db: Session = Depends(get_db)
+): 
+    token = await check_token_request(token_id, db)
+    if not isinstance(token, models.RunToken):
+        return token
+
+    response_content = crud.get_available_processes_and_tags(db, token_id, runName)
+
+    return ORJSONResponse(content=jsonable_encoder(response_content), status_code=200)
+
+    
 
 
 @app.get("/run/table/{token_id}")
@@ -334,34 +349,6 @@ async def get_table_data(
     paginated_table, number_available = crud.get_paginated_table(db, token_id, runName, int(page), int(rows), sortField, sort_order, filters)
     
     return ORJSONResponse(content=jsonable_encoder({'table_page': paginated_table, 'number_available': number_available}), status_code=200)
-
-@app.get("/run/ram_plot/{token_id}")
-async def get_ram_plot_data(token_id: str, processFilter, tagFilter, runName, db: Session = Depends(get_db), response_class=ORJSONResponse):
-    token = await check_token_request(token_id, db)
-    if not isinstance(token, models.RunToken):
-        return token
-    
-    process_filter = json.loads(processFilter)
-    tag_filter = json.loads(tagFilter)
-    run_name = json.loads(runName)
-
-    filtered_ram_plot_results = crud.get_filtered_ram_plot_results(db, token_id, run_name, process_filter, tag_filter)
-    
-    return ORJSONResponse(content=jsonable_encoder(filtered_ram_plot_results), status_code=200)
-    
-@app.get("/run/cpu_allocation_plot/{token_id}")
-async def get_cpu_allocation_plot_data(token_id: str, processFilter, tagFilter, runName,  db: Session = Depends(get_db), response_class=ORJSONResponse):
-    token = await check_token_request(token_id, db)
-    if not isinstance(token, models.RunToken):
-        return token
-
-    process_filter = json.loads(processFilter)
-    tag_filter = json.loads(tagFilter)
-    run_name = json.loads(runName)
-
-    filtered_cpu_plot_results = crud.get_filtered_cpu_allocation_plot_results(db, token_id, run_name, process_filter, tag_filter)
-
-    return ORJSONResponse(content=jsonable_encoder(filtered_cpu_plot_results), status_code=200)
 
 
 ### TODO: use this! implement function in crud and use response in ui
