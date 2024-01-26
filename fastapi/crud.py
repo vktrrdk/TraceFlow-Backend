@@ -1,8 +1,7 @@
 import json
 from datetime import datetime
-import time
 from fastapi import Depends
-
+import os
 from database import engine, get_session, get_async_session
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,8 +11,13 @@ import string, random
 import models, schemas, helpers
 import logging
 import numpy as np
+from redis import Redis
+from pottery import Redlock
 
 logger = logging.getLogger('rq.worker')
+
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+r_con = Redis(host=REDIS_HOST, port=6379)
 
 """
 Change the Session for each database query, instead of using all the same!
@@ -904,28 +908,31 @@ async def persist_object_data(async_session, add_object):
 
 async def persist_singleton_trace_data(async_session, trace_object: models.RunTrace):
     async with async_session.begin():
-        result_traces = await async_session.execute(
-            select(models.RunTrace).where(
-                models.RunTrace.task_id == trace_object.task_id,
-                models.RunTrace.token == trace_object.token, 
-                models.RunTrace.run_id == trace_object.run_id,
-            )
+
+        task_lock = Redlock(
+            key=f"trace_{trace_object.token}_{trace_object.run_name}_{trace_object.task_id}",
+            masters={r_con}
         )
-        
-        task_trace_object = result_traces.first()
-        if task_trace_object:
-            # this needs to be adjusted! seems like some adds are still slipping through - e.g when during retrieval of the object there is a an update -->
-            # check for race condition fix
-            task_trace_object = task_trace_object[0]
-            if helpers.has_newer_state(task_trace_object, trace_object):
-                await async_session.delete(task_trace_object)
+        with task_lock:
+            result_traces = await async_session.execute(
+                select(models.RunTrace).where(
+                    models.RunTrace.task_id == trace_object.task_id,
+                    models.RunTrace.token == trace_object.token, 
+                    models.RunTrace.run_name == trace_object.run_name,
+                )
+            )
+
+            task_trace_object = result_traces.first()
+            if task_trace_object:
+                task_trace_object = task_trace_object[0]
+                if helpers.has_newer_state(task_trace_object, trace_object):
+                    await async_session.delete(task_trace_object)
+                    async_session.add(trace_object)
+            else:
                 async_session.add(trace_object)
-        else:
-            async_session.add(trace_object)
-        await async_session.commit()
+            await async_session.commit()
 
         
-
 
 
 
