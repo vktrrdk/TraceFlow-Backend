@@ -14,10 +14,12 @@ import numpy as np
 from redis import Redis
 from pottery import Redlock
 
-logger = logging.getLogger('rq.worker')
 
 REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
 r_con = Redis(host=REDIS_HOST, port=6379)
+
+logger = logging.getLogger('rq.worker')
+
 
 """
 Change the Session for each database query, instead of using all the same!
@@ -388,6 +390,7 @@ def get_process_data(json_ob, stat_id):
                             "load_cpus": process.get("loadCpus", None),
                             "total_count": process.get("totalCount", None),
                             "succeeded": process.get("succeeded", None),
+                       
                             "errored": process.get("errored", None),
                             "running": process.get("running", None),
                             "retries": process.get("retries", None),
@@ -931,8 +934,6 @@ async def persist_singleton_trace_data(async_session, trace_object: models.RunTr
             else:
                 async_session.add(trace_object)
             await async_session.commit()
-
-        
 
 
 
