@@ -553,11 +553,30 @@ def update_trace_state(trace_id: str, new_state: str):
 """    
 
 def get_progress_for_token_and_run(db: Session, token_id, run_name):
+    print(f"Token: {token_id} - run: {run_name}")
     traces = db.query(models.RunTrace).filter(models.RunTrace.token == token_id, models.RunTrace.run_name == run_name).all()
-    progress_values = helpers.get_progress_values_for_trace_list(traces) 
+    print(len(traces))
+    run_and_processes_state = helpers.get_progress_values_for_trace_list(traces) 
+    run_and_processes_state["run_state"] = get_run_state(db, token_id, run_name, traces)
+    return run_and_processes_state
 
-    return progress_values
-
+def get_run_state(db: Session, token_id, run_name, traces):
+    run_meta = db.query(models.RunMetadata).filter(
+        models.RunMetadata.token == token_id, models.RunMetadata.run_name ==run_name
+        ).order_by(models.RunMetadata.timestamp.desc()).first()
+    if run_meta:
+        if run_meta.event == "started":
+            if helpers.has_running_tasks(traces):
+                return "RUNNING"
+            else:
+                return "SUBMITTED"
+        elif run_meta.event == "completed":
+            if run_meta.error_message == "SIGINT":
+                return "ABORTED"
+            elif run_meta.error_message is not None:
+                return "FAILED"
+            return "COMPLETED"
+    return "UNAVAILABLE"
 
 
 def get_processes_for_token_and_run(db: Session, token_id, run_name):
@@ -633,7 +652,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'max': max_val,
             }
 
-        except IndexError as e:
+        except IndexError or ValueError as e:
             logger.info(f"IndexError - {e}\n\nDue to missing memory percentage values")
             relative_ram_boxplot_values[process] = {}
 
@@ -654,7 +673,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'max': max_val,
             }
         
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing cpu allocation values")
             cpu_allocation_boxplot_values[process] = {}
 
@@ -676,7 +695,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'max': max_val,
             }
 
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing raw cpu usage values")
             cpu_used_boxplot_values[process] = {}
 
@@ -696,7 +715,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'q3': q3,
                 'max': max_val,
             }
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing i/o read values")
             io_read_boxplot_values[process] = {}
         
@@ -716,7 +735,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'q3': q3,
                 'max': max_val,
             }
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing i/o write values")
             io_written_boxplot_values[process] = {}
 
@@ -738,7 +757,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'q3': q3,
                 'max': max_val,
             }
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing virtual memory values")
             vmem_boxplot_values[process] = {}
         
@@ -756,7 +775,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'q3': q3,
                 'max': max_val,
             }
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing requested memory values")
             ram_requested_boxplot_values[process] = {}
         
@@ -774,7 +793,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'q3': q3,
                 'max': max_val,
             }
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing rss memory values")
             rss_boxplot_values[process] = {}
 
@@ -783,7 +802,6 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
         single_realtime_values = [helpers.convert_to_time_format(time_format=duration_format, value=np.int64(task.realtime)) for task in tasks if task.realtime]
         summarized_realtime_values = sum(single_realtime_values)
 
-    
 
         try: 
             q1 = np.percentile(single_realtime_values, 25)
@@ -801,7 +819,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
             }
             duration_sum_bar_values[process] = summarized_realtime_values
 
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing time values")
             duration_time_boxplot_values[process] = {}
             duration_sum_bar_values[process] = 0
@@ -826,7 +844,7 @@ def get_plot_results(db: Session, token_id, run_name, process_filter, tag_filter
                 'yMax': y_max,
             }
 
-        except IndexError as e:
+        except (IndexError, ValueError) as e:
             logger.info(f"IndexError - {e}\n\nDue to missing cpu or memory allocation values")
             ram_ratio_plot_values[process] = {}
 

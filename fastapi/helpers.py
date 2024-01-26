@@ -457,6 +457,10 @@ def has_newer_state(old_trace_entry: models.RunTrace, new_trace_entry: models.Ru
     old_status, new_status = old_trace_entry.status, new_trace_entry.status
     return STATUS_SORTING.index(new_status) > STATUS_SORTING.index(old_status)
     
+def has_running_tasks(traces):
+    check_states = ["RUNNING", "COMPLETED", "CACHED", "FAILED"]
+    is_running = any(trace.status in check_states for trace in traces)
+    return is_running
 
 
 def group_runwise(data):
